@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "api/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/api/models", "destination": "/api/models" },
+    { "source": "/api/refresh", "destination": "/api/refresh" }
+  ]
+}
