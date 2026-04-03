@@ -128,6 +128,15 @@
     }
     .filter-btn:hover { border-color: var(--aa); color: var(--aa); background: var(--aa-s); }
     .filter-btn.active { background: var(--aa); color: #fff; border-color: var(--aa); font-weight: 600; }
+    .score-toggle { display: flex; align-items: center; gap: 0; margin-left: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 2px; }
+    .stog-btn {
+      padding: 4px 11px; border-radius: 5px; font-size: .73rem; font-weight: 500;
+      border: none; background: transparent; color: var(--sub); cursor: pointer;
+      font-family: var(--font); transition: all .12s; white-space: nowrap;
+    }
+    .stog-btn.active { background: var(--aa); color: #fff; font-weight: 600; }
+    .stog-btn:not(.active):hover { color: var(--aa); }
+
     .search-wrap { margin-left: auto; position: relative; }
     .search-wrap svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); }
     .search-input {
@@ -256,6 +265,13 @@
     .pill.free { background: #D1FAE5; color: #065F46; }
     .pill.paid { background: #FEF3C7; color: #92400E; }
 
+    /* Intelligence cell: ceiling + practical */
+    .intel-cell { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+    .intel-active      { font-weight: 800; font-variant-numeric: tabular-nums; cursor: help; color: var(--text); }
+    .intel-dim         { font-weight: 500; font-variant-numeric: tabular-nums; cursor: help; color: var(--muted); }
+    .intel-prac        { font-size: .7rem; font-weight: 500; color: var(--muted); background: var(--faint); padding: 1px 5px; border-radius: 4px; font-variant-numeric: tabular-nums; cursor: help; }
+    .intel-active-prac { font-size: .7rem; font-weight: 800; color: #065F46; background: #D1FAE5; padding: 1px 5px; border-radius: 4px; font-variant-numeric: tabular-nums; cursor: help; }
+
     /* OR model ID */
     .or-id { font-family: 'Fira Code', monospace; font-size: .68rem; color: var(--aa); max-width: 180px; overflow: hidden; text-overflow: ellipsis; display: block; }
 
@@ -362,6 +378,19 @@
     .sig-dot.on  { }
     .sig-dot.off { opacity: .15; }
 
+    /* Platform rank chips in value table */
+    .rank-chips { display: flex; flex-wrap: wrap; gap: 3px; min-width: 160px; }
+    .rank-chip {
+      font-size: .62rem; font-weight: 600; padding: 2px 6px; border-radius: 4px;
+      white-space: nowrap; cursor: help;
+    }
+    .rank-chip.aa    { background: var(--aa-t); color: var(--aa); }
+    .rank-chip.ac    { background: var(--ac-t); color: var(--ac); }
+    .rank-chip.at    { background: #FEF3C7; color: #92400E; }
+    .rank-chip.ce    { background: var(--ce-t); color: var(--ce); }
+    .rank-chip.usage { background: var(--usage-t); color: var(--usage); }
+    .rank-chip.oc    { background: var(--usage-t); color: var(--usage); }
+
     /* OR id in value table */
     .v-orid { font-family: 'Fira Code', monospace; font-size: .67rem; color: var(--aa); max-width: 160px; overflow: hidden; text-overflow: ellipsis; display: block; }
 
@@ -434,6 +463,11 @@
     <button class="filter-btn" data-filter="free" onclick="setFilter('free',this)">🆓 Free</button>
     <button class="filter-btn" data-filter="longctx" onclick="setFilter('longctx',this)">📄 Long context</button>
     <button class="filter-btn" data-filter="vision" onclick="setFilter('vision',this)">👁 Vision</button>
+    <div class="score-toggle" id="scoreToggle">
+      <span class="filter-label" style="margin-right:6px">Intelligence:</span>
+      <button class="stog-btn active" id="stogCeil" onclick="setScoreMode('ceiling',this)" data-tip="Sort by the best possible score — max reasoning effort. Use this to compare model ceilings.">⚡ Ceiling</button>
+      <button class="stog-btn"        id="stogPrac" onclick="setScoreMode('practical',this)" data-tip="Sort by the practical score — default/non-reasoning mode. Use this for real-world deployment decisions.">⚙ Practical</button>
+    </div>
     <div class="search-wrap">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input class="search-input" id="searchInput" placeholder="Search models…" oninput="render()">
@@ -480,7 +514,7 @@
                 <th class="r">Quality</th>
                 <th class="r">$/1M out</th>
                 <th class="r">Value Score ↑</th>
-                <th>Data Sources</th>
+                <th>Platform Ranks</th>
                 <th>Confidence</th>
                 <th>Model ID</th>
               </tr>
@@ -506,7 +540,7 @@
                 <th class="r">Quality</th>
                 <th class="r">Speed</th>
                 <th class="r">Context</th>
-                <th>Data Sources</th>
+                <th>Platform Ranks</th>
                 <th>Confidence</th>
                 <th>Model ID</th>
               </tr>
@@ -544,6 +578,7 @@ let data = null;
 let sortCol = "aa.intelligenceIndex";
 let sortAsc = false;
 let activeFilter = "all";
+let scoreMode = "ceiling"; // "ceiling" | "practical"
 
 // [key, label, num, group, groupEnd, tooltip]
 const COLS = [
@@ -551,7 +586,7 @@ const COLS = [
   ["name",   "Model",false,"",  false, ""],
   ["creator","By",   false,"",  true,  ""],
 
-  ["aa.intelligenceIndex","Intelligence",true,"aa",false,"Composite of 10 AI benchmarks (0–60). The most reliable single measure of model quality. 50+ = elite."],
+  ["aa.intelligenceIndex","Intelligence",true,"aa",false,"Ceiling score — best inference setting (e.g. max reasoning effort). Practical score in grey = default/non-reasoning mode, which is what you actually get in production. Gap between them = how much reasoning effort costs you."],
   ["aa.codingIndex",      "Coding",      true,"aa",false,"Coding-specific benchmark score. 45+ = strong coder. Measures ability to write, debug and review code."],
   ["aa.mathIndex",        "Math",        true,"aa",false,"Mathematical reasoning score (0–100). Includes MATH-500, AIME and similar. 90+ = excellent."],
   ["aa.speedToksPerSec",  "Speed",       true,"aa",true, "Output tokens per second. Higher = faster responses. 100+ tok/s feels snappy, below 50 feels slow."],
@@ -599,6 +634,8 @@ const BAR_COLOR = {
 
 function gv(obj, key) {
   if (!key || key === "_rank") return null;
+  // When sorting by intelligence, respect the current score mode
+  if (key === "aa.intelligenceIndex") return effectiveIntel(obj);
   return key.split(".").reduce((o,k) => o?.[k] ?? null, obj);
 }
 
@@ -644,6 +681,24 @@ function setFilter(f, el) {
   document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
   el.classList.add("active");
   render();
+}
+
+function setScoreMode(mode, el) {
+  scoreMode = mode;
+  document.querySelectorAll(".stog-btn").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+  render();
+}
+
+// Get the effective intelligence score for a model based on current scoreMode
+function effectiveIntel(m) {
+  const aa = m.aa;
+  if (!aa) return null;
+  if (scoreMode === "practical") {
+    // Fall back to ceiling if practical not available
+    return aa.practicalIndex ?? aa.intelligenceIndex;
+  }
+  return aa.intelligenceIndex;
 }
 
 function sortBy(col) {
@@ -828,7 +883,22 @@ function render() {
     row += `<td class="g- ge"><span class="creator">${m.creator}</span></td>`;
 
     // AA
-    row += numCell(aa?.intelligenceIndex, "aa.intelligenceIndex", "aa", false);
+    // Intelligence: ceiling + practical, highlight active mode
+    const ceil = aa?.intelligenceIndex;
+    const prac = aa?.practicalIndex;
+    const setting = aa?.ceilingSetting || "";
+    const hasDiff = prac != null && ceil != null && Math.abs(ceil - prac) >= 0.5;
+    const isCeilMode = scoreMode === "ceiling";
+    const ceilTip = `Ceiling${setting ? ' ('+setting+')' : ''}: ${ceil} — best inference setting`;
+    const pracTip = hasDiff ? `Practical (non-reasoning): ${prac} — what you get in production` : "";
+    const ceilCls = isCeilMode ? "intel-active" : "intel-dim";
+    const pracCls = !isCeilMode ? "intel-active-prac" : "intel-prac";
+    const intelHtml = ceil != null ? `
+      <div class="intel-cell">
+        <span class="${ceilCls}" data-tip="${ceilTip}">${ceil.toFixed(1)}</span>
+        ${hasDiff ? `<span class="${pracCls}" data-tip="${pracTip}">${prac.toFixed(1)}</span>` : ''}
+      </div>` : `<span class="score-empty">—</span>`;
+    row += `<td class="num g-aa">${intelHtml}</td>`;
     row += numCell(aa?.codingIndex,       "aa.codingIndex",       "aa", false);
     row += numCell(aa?.mathIndex,         "aa.mathIndex",         "aa", false);
     row += numCell(aa?.speedToksPerSec,   "aa.speedToksPerSec",   "aa", true);
@@ -917,8 +987,9 @@ function computeQuality(m) {
   const vals = {};
 
   const aa = m.aa, or = m.openRouter;
-  if (aa?.intelligenceIndex != null) vals.intel = aa.intelligenceIndex / 60;
-  if (aa?.codingIndex != null)       vals.coding = aa.codingIndex / 60;
+  const intel = effectiveIntel(m);
+  if (intel != null) vals.intel = intel / 60;
+  if (aa?.codingIndex != null) vals.coding = aa.codingIndex / 60;
   if (m.clawEval?.passAll3Rate != null) vals.claw = m.clawEval.passAll3Rate;
   const elo = m.arenaCode?.elo;
   if (elo != null) vals.arena = Math.max(0, Math.min(1, (elo - 1200) / (1560 - 1200)));
@@ -955,6 +1026,31 @@ function qsHtml(score) {
 
 function confHtml(q) {
   return `<span class="conf ${q.conf}" data-tip="${q.sigTooltip}">${q.confLabel}</span>`;
+}
+
+function platformRanksHtml(m) {
+  const items = [];
+  if (m.aa?.intelligenceIndex != null) {
+    // AA rank = position in full aa-sorted list (approximate from our data)
+    items.push(`<span class="rank-chip aa" data-tip="Artificial Analysis Intelligence rank">AA</span>`);
+  }
+  if (m.arenaCode?.rank) {
+    items.push(`<span class="rank-chip ac" data-tip="Arena Code rank #${m.arenaCode.rank} (ELO: ${m.arenaCode.elo})">#${m.arenaCode.rank} Arena Code</span>`);
+  }
+  if (m.arenaText?.rank) {
+    items.push(`<span class="rank-chip at" data-tip="Arena Text rank #${m.arenaText.rank} (ELO: ${m.arenaText.elo})">#${m.arenaText.rank} Arena Chat</span>`);
+  }
+  if (m.clawEval?.passAll3Rate != null) {
+    items.push(`<span class="rank-chip ce" data-tip="Claw-Eval Pass³: ${(m.clawEval.passAll3Rate*100).toFixed(1)}%">${(m.clawEval.passAll3Rate*100).toFixed(0)}% Claw</span>`);
+  }
+  if (m.orUsage?.rank) {
+    items.push(`<span class="rank-chip usage" data-tip="OpenRouter usage rank #${m.orUsage.rank}">#${m.orUsage.rank} OR</span>`);
+  }
+  if (m.openClawUsage?.rank) {
+    items.push(`<span class="rank-chip oc" data-tip="OpenClaw usage rank #${m.openClawUsage.rank}">#${m.openClawUsage.rank} OC</span>`);
+  }
+  if (!items.length) return '<span style="color:var(--muted);font-size:.7rem">—</span>';
+  return `<div class="rank-chips">${items.join("")}</div>`;
 }
 
 function sigDotsHtml(q) {
@@ -1015,7 +1111,7 @@ function buildValueTable() {
       <td class="r">${qsHtml(q.score)}</td>
       <td class="r" style="font-weight:600">$${or.outputPricePerMillion.toFixed(2)}</td>
       <td class="r"><span class="vs-num ${vsClass}">${valueScore.toFixed(1)}</span></td>
-      <td>${sigDotsHtml(q)}</td>
+      <td>${platformRanksHtml(m)}</td>
       <td>${confHtml(q)}</td>
       <td><span class="v-orid" title="${or.id}">${or.id}</span></td>
     </tr>`;
@@ -1037,7 +1133,7 @@ function buildValueTable() {
       <td class="r">${qsHtml(q.score)}</td>
       <td class="r" style="color:var(--sub)">${speed}</td>
       <td class="r" style="color:var(--sub)">${ctx}</td>
-      <td>${sigDotsHtml(q)}</td>
+      <td>${platformRanksHtml(m)}</td>
       <td>${confHtml(q)}</td>
       <td><span class="v-orid" title="${or?.id||''}">${or?.id||'—'}</span></td>
     </tr>`;

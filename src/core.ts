@@ -14,7 +14,9 @@ export interface UnifiedModel {
   sources: string[];    // which sources this model appeared in
 
   aa: {
-    intelligenceIndex: number | null;
+    intelligenceIndex: number | null;       // ceiling — best inference setting
+    practicalIndex: number | null;          // practical — non-reasoning/default setting
+    ceilingSetting: string | null;          // label e.g. "Adaptive Reasoning, Max Effort"
     codingIndex: number | null;
     mathIndex: number | null;
     speedToksPerSec: number | null;
@@ -143,6 +145,7 @@ interface Candidate {
   name: string;
   creator: string;
   aaModel?: AAModel;
+  aaPractical?: AAModel | null;   // best non-reasoning variant (practical score)
   arenaCodeModel?: ArenaModel & { vendor: string };
   arenaTextModel?: ArenaModel & { vendor: string };
   clawModel?: ClawEvalModel;
@@ -193,31 +196,52 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
 
   // Deduplicate AA models by family name (strip inference-setting suffixes like
   // "(Reasoning)", "(xhigh)", "(Non-reasoning, High Effort)" etc.)
-  // Keep only the best-scoring variant per family — matching AA's own leaderboard.
+  // Keep best-scoring variant as ceiling, plus lowest-scoring non-reasoning variant as practical.
   function aaFamilyName(name: string): string {
     return name.replace(/\s*\(.*?\)\s*$/, "").trim();
   }
-  const aaByFamily = new Map<string, AAModel>();
+  function isNonReasoning(name: string): boolean {
+    return /non-reasoning|non reasoning|minimal|chatgpt/i.test(name);
+  }
+  function extractSetting(name: string): string {
+    const m = name.match(/\(([^)]+)\)/);
+    return m ? m[1] : "";
+  }
+
+  // family → { best (ceiling), practical (best non-reasoning variant) }
+  const aaByFamily = new Map<string, { best: AAModel; practical: AAModel | null }>();
   for (const m of aaModels) {
     if (m.evaluations?.artificial_analysis_intelligence_index == null) continue;
     const family = aaFamilyName(m.name);
-    const existing = aaByFamily.get(family);
-    if (!existing ||
-        (m.evaluations.artificial_analysis_intelligence_index ?? 0) >
-        (existing.evaluations.artificial_analysis_intelligence_index ?? 0)) {
-      aaByFamily.set(family, m);
+    const score = m.evaluations.artificial_analysis_intelligence_index ?? 0;
+    const entry = aaByFamily.get(family);
+    if (!entry) {
+      aaByFamily.set(family, {
+        best: m,
+        practical: isNonReasoning(m.name) ? m : null,
+      });
+    } else {
+      // Update ceiling if this is the best
+      if (score > (entry.best.evaluations.artificial_analysis_intelligence_index ?? 0)) {
+        entry.best = m;
+      }
+      // Track best non-reasoning variant as practical
+      if (isNonReasoning(m.name)) {
+        const practicalScore = entry.practical?.evaluations.artificial_analysis_intelligence_index ?? -1;
+        if (score > practicalScore) entry.practical = m;
+      }
     }
   }
 
   // From AA — top 50 deduplicated families by intelligence
   const aaTop = [...aaByFamily.values()]
     .sort((a, b) =>
-      (b.evaluations.artificial_analysis_intelligence_index ?? 0) -
-      (a.evaluations.artificial_analysis_intelligence_index ?? 0)
+      (b.best.evaluations.artificial_analysis_intelligence_index ?? 0) -
+      (a.best.evaluations.artificial_analysis_intelligence_index ?? 0)
     )
     .slice(0, 50);
 
-  for (const aa of aaTop) {
+  for (const { best: aa, practical } of aaTop) {
     const keys = [
       ...modelKeys(aa.model_creator.name, aa.name),
       norm(aa.model_creator.slug + aa.slug),
@@ -225,6 +249,7 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
     ];
     const c = getOrCreateCandidate(keys, aa.name, aa.model_creator.name);
     c.aaModel = aa;
+    c.aaPractical = practical;
   }
 
   // From Arena Code — top 40
@@ -305,6 +330,8 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
 
       aa: aa ? {
         intelligenceIndex: aa.evaluations.artificial_analysis_intelligence_index ?? null,
+        practicalIndex:    c.aaPractical?.evaluations.artificial_analysis_intelligence_index ?? null,
+        ceilingSetting:    extractSetting(aa.name) || null,
         codingIndex:       aa.evaluations.artificial_analysis_coding_index ?? null,
         mathIndex:         aa.evaluations.artificial_analysis_math_index ?? null,
         speedToksPerSec:   aa.median_output_tokens_per_second ?? null,
