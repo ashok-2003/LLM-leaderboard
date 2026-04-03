@@ -1,0 +1,14 @@
+{
+  "name": "openclaw-model-routing",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "fetch": "tsx src/fetch-and-match.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

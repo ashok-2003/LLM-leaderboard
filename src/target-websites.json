@@ -1,0 +1,52 @@
+[
+  {
+    "id": "artificial-analysis",
+    "name": "Artificial Analysis",
+    "url": "https://artificialanalysis.ai/leaderboards/models",
+    "apiUrl": "https://artificialanalysis.ai/api/v2/data/llms/models",
+    "authType": "api-key",
+    "enabled": true
+  },
+  {
+    "id": "arena-code",
+    "name": "Arena.ai Code",
+    "url": "https://arena.ai/leaderboard/code",
+    "apiUrl": "https://api.wulong.dev/arena-ai-leaderboards/v1/leaderboard?name=code",
+    "authType": "none",
+    "enabled": true
+  },
+  {
+    "id": "arena-text",
+    "name": "Arena.ai Text",
+    "url": "https://arena.ai/leaderboard",
+    "apiUrl": "https://api.wulong.dev/arena-ai-leaderboards/v1/leaderboard?name=text",
+    "authType": "none",
+    "enabled": true
+  },
+  {
+    "id": "claw-eval",
+    "name": "Claw-Eval",
+    "url": "https://claw-eval.github.io/",
+    "apiUrl": null,
+    "authType": "none",
+    "enabled": true,
+    "note": "Data embedded in JS bundle, parsed at fetch time"
+  },
+  {
+    "id": "openrouter",
+    "name": "OpenRouter",
+    "url": "https://openrouter.ai/models",
+    "apiUrl": "https://openrouter.ai/api/v1/models",
+    "authType": "none",
+    "enabled": true
+  },
+  {
+    "id": "design-arena",
+    "name": "Design Arena",
+    "url": "https://www.designarena.ai/leaderboard/code",
+    "apiUrl": null,
+    "authType": "none",
+    "enabled": false,
+    "note": "No public API available yet"
+  }
+]

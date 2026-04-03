@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Routing — AI Leaderboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --font: 'Inter', system-ui, sans-serif;
+      --bg:      #F8FAFC;
+      --surface: #FFFFFF;
+      --border:  #E2E8F0;
+      --border2: #CBD5E1;
+      --text:    #0F172A;
+      --sub:     #475569;
+      --muted:   #94A3B8;
+      --faint:   #E2E8F0;
+
+      /* Source colors */
+      --aa:    #2563EB;  --aa-s: #EFF6FF;  --aa-t: #DBEAFE;
+      --ac:    #059669;  --ac-s: #ECFDF5;  --ac-t: #D1FAE5;
+      --ce:    #7C3AED;  --ce-s: #F5F3FF;  --ce-t: #EDE9FE;
+      --or:    #EA580C;  --or-s: #FFF7ED;  --or-t: #FFEDD5;
+      --usage: #DB2777;  --usage-s:#FDF2F8; --usage-t:#FCE7F3;
+
+      --radius: 10px;
+      --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -1px rgba(0,0,0,.04);
+    }
+
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── Topnav ── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 1px 0 var(--border);
+    }
+    .nav-left { display: flex; align-items: center; gap: 10px; }
+    .nav-logo  { font-size: .95rem; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+    .nav-logo span { color: var(--aa); }
+    .nav-badge { font-size: .65rem; font-weight: 600; background: var(--aa-t); color: var(--aa); padding: 2px 7px; border-radius: 20px; }
+    .nav-right { display: flex; align-items: center; gap: 10px; }
+    .ts-label  { font-size: .72rem; color: var(--muted); }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: 8px; font-family: var(--font);
+      font-size: .8rem; font-weight: 600; cursor: pointer; border: none;
+      transition: all .15s;
+    }
+    .btn-primary { background: var(--aa); color: #fff; }
+    .btn-primary:hover { background: #1D4ED8; }
+    .btn-primary:active { transform: scale(.97); }
+    .btn-primary:disabled { background: var(--faint); color: var(--muted); cursor: wait; }
+
+    /* ── Page layout ── */
+    .page { max-width: 1800px; margin: 0 auto; padding: 20px 24px 40px; }
+
+    /* ── Hero cards ── */
+    .hero { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .hero-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+      box-shadow: var(--shadow); position: relative; overflow: hidden;
+    }
+    .hero-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    }
+    .hero-card.aa::before    { background: var(--aa); }
+    .hero-card.ac::before    { background: var(--ac); }
+    .hero-card.ce::before    { background: var(--ce); }
+    .hero-card.or::before    { background: var(--or); }
+    .hero-card.usage::before { background: var(--usage); }
+
+    .hero-card-label {
+      font-size: .65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .6px; margin-bottom: 10px; display: flex; align-items: center; gap: 5px;
+    }
+    .hero-card.aa    .hero-card-label { color: var(--aa); }
+    .hero-card.ac    .hero-card-label { color: var(--ac); }
+    .hero-card.ce    .hero-card-label { color: var(--ce); }
+    .hero-card.or    .hero-card-label { color: var(--or); }
+    .hero-card.usage .hero-card-label { color: var(--usage); }
+
+    .hero-list { display: flex; flex-direction: column; gap: 7px; }
+    .hero-row  { display: flex; align-items: center; gap: 8px; }
+    .hero-pos  {
+      font-size: .65rem; font-weight: 800; width: 18px; height: 18px;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .hero-pos.p1 { background: #FEF3C7; color: #92400E; }
+    .hero-pos.p2 { background: #F1F5F9; color: #475569; }
+    .hero-pos.p3 { background: #FFF7ED; color: #C2410C; opacity:.8; }
+    .hero-row-info { flex: 1; min-width: 0; }
+    .hero-row-name { font-size: .75rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hero-row-meta { font-size: .65rem; color: var(--muted); margin-top: 1px; }
+    .hero-row-score {
+      font-size: .75rem; font-weight: 800; flex-shrink: 0;
+    }
+    .hero-card.aa    .hero-row-score { color: var(--aa); }
+    .hero-card.ac    .hero-row-score { color: var(--ac); }
+    .hero-card.ce    .hero-row-score { color: var(--ce); }
+    .hero-card.or    .hero-row-score { color: var(--or); }
+    .hero-card.usage .hero-row-score { color: var(--usage); }
+    .hero-divider { height: 1px; background: var(--border); margin: 2px 0; }
+
+    /* ── Filters ── */
+    .filters {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 14px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 16px; box-shadow: var(--shadow);
+    }
+    .filter-label { font-size: .72rem; font-weight: 600; color: var(--muted); margin-right: 4px; }
+    .filter-btn {
+      padding: 5px 12px; border-radius: 20px; font-size: .75rem; font-weight: 500;
+      border: 1px solid var(--border); background: transparent; color: var(--sub);
+      cursor: pointer; transition: all .12s; font-family: var(--font);
+    }
+    .filter-btn:hover { border-color: var(--aa); color: var(--aa); background: var(--aa-s); }
+    .filter-btn.active { background: var(--aa); color: #fff; border-color: var(--aa); font-weight: 600; }
+    .search-wrap { margin-left: auto; position: relative; }
+    .search-wrap svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+    .search-input {
+      padding: 6px 10px 6px 30px; border: 1px solid var(--border); border-radius: 7px;
+      font-family: var(--font); font-size: .78rem; color: var(--text); outline: none;
+      background: var(--bg); width: 200px; transition: border-color .15s;
+    }
+    .search-input:focus { border-color: var(--aa); background: var(--surface); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+
+    /* ── Table ── */
+    .table-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+    }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1600px; font-size: .8rem; }
+
+    /* Group header */
+    th.gh {
+      padding: 8px 10px 6px; text-align: center; font-size: .68rem;
+      font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+      border-bottom: 2px solid; white-space: nowrap;
+    }
+    th.gh.g-    { background: #F8FAFC; color: var(--muted); border-color: var(--border); }
+    th.gh.g-aa  { background: var(--aa-s); color: var(--aa); border-color: var(--aa); }
+    th.gh.g-ac  { background: var(--ac-s); color: var(--ac); border-color: var(--ac); }
+    th.gh.g-ce  { background: var(--ce-s); color: var(--ce); border-color: var(--ce); }
+    th.gh.g-or  { background: var(--or-s); color: var(--or); border-color: var(--or); }
+    th.gh.g-usage { background: var(--usage-s); color: var(--usage); border-color: var(--usage); }
+
+    /* Sub header */
+    th.sh {
+      padding: 7px 10px; font-size: .7rem; font-weight: 600; color: var(--sub);
+      white-space: nowrap; cursor: pointer; user-select: none;
+      border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+    }
+    th.sh:hover { color: var(--text); }
+    th.sh.active { color: var(--text); }
+    th.sh.num { text-align: right; }
+    th.sh.g-    { background: #F8FAFC; }
+    th.sh.g-aa  { background: var(--aa-s); }
+    th.sh.g-ac  { background: var(--ac-s); }
+    th.sh.g-ce  { background: var(--ce-s); }
+    th.sh.g-or  { background: var(--or-s); }
+    th.sh.g-usage { background: var(--usage-s); }
+    .sort-arrow { font-size: .58rem; margin-left: 3px; opacity: .5; }
+    th.active .sort-arrow { opacity: 1; }
+
+    /* Tooltip on th */
+    .th-inner { display: flex; align-items: center; gap: 4px; white-space: nowrap; position: relative; }
+    th.sh.num .th-inner { justify-content: flex-end; }
+    .tip-icon { width: 13px; height: 13px; border-radius: 50%; background: var(--faint); color: var(--muted); font-size: .58rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: help; }
+    .tip-icon:hover::after {
+      content: attr(data-tip);
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      background: #1E293B; color: #F1F5F9; font-size: .7rem; font-weight: 400;
+      padding: 6px 10px; border-radius: 6px; white-space: normal; width: 220px; line-height: 1.5;
+      z-index: 100; box-shadow: var(--shadow-md); pointer-events: none;
+    }
+    .tip-icon:hover::before {
+      content: ''; position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%);
+      border: 5px solid transparent; border-top-color: #1E293B; z-index: 100;
+    }
+
+    /* Group divider */
+    th.ge, td.ge { border-right: 1px solid var(--border2); }
+
+    /* Data rows */
+    td {
+      padding: 9px 10px; border-bottom: 1px solid var(--border);
+      vertical-align: middle; white-space: nowrap;
+    }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.g-   { background: #fff; }
+    td.g-aa { background: var(--aa-s); }
+    td.g-ac { background: var(--ac-s); }
+    td.g-ce { background: var(--ce-s); }
+    td.g-or { background: var(--or-s); }
+    td.g-usage { background: var(--usage-s); }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { filter: brightness(.97); }
+
+    /* Rank */
+    .rank-num { font-size: .75rem; font-weight: 700; color: var(--muted); width: 28px; text-align: center; }
+    .rank-num.top1 { color: #B45309; }
+    .rank-num.top2 { color: #64748B; }
+    .rank-num.top3 { color: #B45309; opacity: .7; }
+
+    /* Model cell */
+    .model-cell { display: flex; flex-direction: column; gap: 3px; }
+    .model-name { font-weight: 600; font-size: .82rem; color: var(--text); max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+    .model-tags { display: flex; gap: 3px; flex-wrap: wrap; }
+    .tag { font-size: .6rem; font-weight: 600; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+    .tag.coding   { background: #DBEAFE; color: #1E40AF; }
+    .tag.agents   { background: #EDE9FE; color: #5B21B6; }
+    .tag.reason   { background: #F0FDF4; color: #166534; }
+    .tag.fast     { background: #FEF3C7; color: #92400E; }
+    .tag.free     { background: #ECFDF5; color: #065F46; }
+    .tag.long     { background: #FFF7ED; color: #9A3412; }
+    .tag.vision   { background: #FDF4FF; color: #701A75; }
+
+    /* Creator chip */
+    .creator { font-size: .68rem; color: var(--sub); background: var(--bg); border: 1px solid var(--border); padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+
+    /* Score value */
+    .score-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .score-bar-wrap { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+    .score-bar-track { width: 36px; height: 5px; background: var(--faint); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+    .score-bar-fill  { height: 100%; border-radius: 3px; }
+    .score-empty { color: var(--muted); font-size: .72rem; }
+
+    /* ELO chip */
+    .elo { font-weight: 700; font-size: .82rem; }
+
+    /* Pill */
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .68rem; font-weight: 600; }
+    .pill.yes  { background: #D1FAE5; color: #065F46; }
+    .pill.no   { background: var(--faint); color: var(--muted); }
+    .pill.free { background: #D1FAE5; color: #065F46; }
+    .pill.paid { background: #FEF3C7; color: #92400E; }
+
+    /* OR model ID */
+    .or-id { font-family: 'Fira Code', monospace; font-size: .68rem; color: var(--aa); max-width: 180px; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+    /* Source dots on model row */
+    .src-dots { display: flex; gap: 3px; margin-top: 3px; }
+    .src-dot  { width: 5px; height: 5px; border-radius: 50%; }
+
+    /* Loading */
+    .loading-overlay {
+      position: fixed; inset: 0; background: rgba(248,250,252,.85);
+      display: flex; align-items: center; justify-content: center; z-index: 200;
+      backdrop-filter: blur(3px);
+    }
+    .loading-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 32px 40px; text-align: center;
+      box-shadow: var(--shadow-md); min-width: 260px;
+    }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid var(--faint);
+      border-top-color: var(--aa); border-radius: 50%;
+      animation: spin .7s linear infinite; margin: 0 auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-card h3 { margin-top: 16px; font-size: .95rem; font-weight: 700; color: var(--text); }
+    .loading-card p  { margin-top: 6px; font-size: .78rem; color: var(--sub); }
+    .src-list { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 14px; }
+    .src-chip { font-size: .68rem; padding: 3px 8px; border-radius: 20px; background: var(--aa-s); color: var(--aa); font-weight: 500; }
+
+    /* Empty state */
+    .empty { padding: 60px; text-align: center; color: var(--muted); font-size: .85rem; }
+
+    /* Source legend */
+    .source-legend {
+      display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
+      padding: 10px 14px; margin-bottom: 14px;
+    }
+    .src-item { display: flex; align-items: center; gap: 5px; font-size: .72rem; color: var(--sub); }
+    .src-dot-lg { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Stats row */
+    .stats-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .stat-pill {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 14px; box-shadow: var(--shadow);
+      display: flex; flex-direction: column; gap: 1px;
+    }
+    .stat-pill-label { font-size: .65rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+    .stat-pill-val   { font-size: 1.15rem; font-weight: 800; color: var(--text); line-height: 1.1; }
+    .stat-pill-val.aa    { color: var(--aa); }
+    .stat-pill-val.ac    { color: var(--ac); }
+    .stat-pill-val.ce    { color: var(--ce); }
+    .stat-pill-val.or    { color: var(--or); }
+    .stat-pill-val.usage { color: var(--usage); }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-left">
+    <div class="nav-logo">Model <span>Routing</span></div>
+    <div class="nav-badge">Beta</div>
+  </div>
+  <div class="nav-right">
+    <span class="ts-label" id="tsLabel"></span>
+    <button class="btn btn-primary" id="refreshBtn" onclick="doRefresh()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+      Refresh
+    </button>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Hero cards -->
+  <div class="hero" id="hero"></div>
+
+  <!-- Stats -->
+  <div class="stats-row" id="statsRow"></div>
+
+  <!-- Source legend -->
+  <div class="source-legend">
+    <div class="src-item"><div class="src-dot-lg" style="background:var(--aa)"></div><strong>Artificial Analysis</strong> — benchmark scores (intelligence, coding, math, speed)</div>
+    <div class="src-item"><div class="src-dot-lg" style="background:var(--ac)"></div><strong>Arena.ai</strong> — human-voted ELO for code &amp; chat</div>
+    <div class="src-item"><div class="src-dot-lg" style="background:var(--ce)"></div><strong>Claw-Eval</strong> — real-world agent task pass rates</div>
+    <div class="src-item"><div class="src-dot-lg" style="background:var(--or)"></div><strong>OpenRouter</strong> — live pricing &amp; capabilities</div>
+    <div class="src-item"><div class="src-dot-lg" style="background:var(--usage)"></div><strong>Usage</strong> — token volume on OpenRouter &amp; OpenClaw</div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <span class="filter-label">Show best for:</span>
+    <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">All models</button>
+    <button class="filter-btn" data-filter="coding" onclick="setFilter('coding',this)">💻 Coding</button>
+    <button class="filter-btn" data-filter="agents" onclick="setFilter('agents',this)">🤖 Agents</button>
+    <button class="filter-btn" data-filter="reasoning" onclick="setFilter('reasoning',this)">🧠 Reasoning</button>
+    <button class="filter-btn" data-filter="fast" onclick="setFilter('fast',this)">⚡ Fast</button>
+    <button class="filter-btn" data-filter="free" onclick="setFilter('free',this)">🆓 Free</button>
+    <button class="filter-btn" data-filter="longctx" onclick="setFilter('longctx',this)">📄 Long context</button>
+    <button class="filter-btn" data-filter="vision" onclick="setFilter('vision',this)">👁 Vision</button>
+    <div class="search-wrap">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input class="search-input" id="searchInput" placeholder="Search models…" oninput="render()">
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card">
+    <div class="table-wrap">
+      <table>
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading" style="display:none">
+  <div class="loading-card">
+    <div class="spinner"></div>
+    <h3>Fetching live data</h3>
+    <p>Pulling from 5 independent sources</p>
+    <div class="src-list">
+      <span class="src-chip">Artificial Analysis</span>
+      <span class="src-chip">Arena.ai Code</span>
+      <span class="src-chip">Arena.ai Text</span>
+      <span class="src-chip">Claw-Eval</span>
+      <span class="src-chip">OpenRouter</span>
+    </div>
+  </div>
+</div>
+
+<script>
+let data = null;
+let sortCol = "aa.intelligenceIndex";
+let sortAsc = false;
+let activeFilter = "all";
+
+// [key, label, num, group, groupEnd, tooltip]
+const COLS = [
+  ["_rank",  "#",    false,"",  false, "Rank by AA Intelligence Index"],
+  ["name",   "Model",false,"",  false, ""],
+  ["creator","By",   false,"",  true,  ""],
+
+  ["aa.intelligenceIndex","Intelligence",true,"aa",false,"Composite of 10 AI benchmarks (0–60). The most reliable single measure of model quality. 50+ = elite."],
+  ["aa.codingIndex",      "Coding",      true,"aa",false,"Coding-specific benchmark score. 45+ = strong coder. Measures ability to write, debug and review code."],
+  ["aa.mathIndex",        "Math",        true,"aa",false,"Mathematical reasoning score (0–100). Includes MATH-500, AIME and similar. 90+ = excellent."],
+  ["aa.speedToksPerSec",  "Speed",       true,"aa",true, "Output tokens per second. Higher = faster responses. 100+ tok/s feels snappy, below 50 feels slow."],
+
+  ["arenaCode.elo", "Code ELO", true,"ac",false,"Human-voted ELO from Arena.ai code battles. Like chess ELO — 1450+ is top tier."],
+  ["arenaCode.rank","Rank",     true,"ac",false,"Arena Code global rank. Lower = better. #1 is the best voted coding model."],
+  ["arenaText.elo", "Chat ELO", true,"ac",false,"Human-voted ELO from Arena.ai chat battles. Measures real user satisfaction with responses."],
+  ["arenaText.rank","Rank",     true,"ac",true, "Arena Text global rank. Lower = better."],
+
+  ["clawEval.passAll3Rate", "Pass³",      true,"ce",false,"Must pass the same real-world task 3 runs in a row. Very hard. 60%+ is excellent. Best measure of agent reliability."],
+  ["clawEval.avgCompletion","Completion", true,"ce",false,"Avg fraction of a task completed even when not fully passing. 80%+ = highly capable."],
+  ["clawEval.avgRobustness","Robustness", true,"ce",true, "Consistency across retries. 0.98+ = very stable. Low = model is unpredictable."],
+
+  ["openRouter.outputPricePerMillion","$/1M out",true,"or",false,"Output cost per 1 million tokens on OpenRouter. Free models show $0. A typical chat reply is ~500 tokens."],
+  ["openRouter.contextLength",        "Context", true,"or",false,"Max context window. 128K handles ~100 page documents. 1M+ can process full codebases."],
+  ["openRouter.supportsTools",        "Tools",   false,"or",false,"Supports function/tool calling. Required for building agents that call APIs or use external tools."],
+  ["openRouter.isFree",               "Cost",    false,"or",false,"Whether this model is free on OpenRouter. Free models still have rate limits."],
+  ["openRouter.id",                   "Model ID",false,"or",true, "The exact model ID to use in OpenClaw config or OpenRouter API calls."],
+
+  ["orUsage.rank",              "OR Rank",    true,"usage",false,"Rank by total tokens processed on OpenRouter across all apps. Lower = more popular."],
+  ["orUsage.totalTokens",       "OR Tokens",  true,"usage",false,"Total tokens used on OpenRouter. More = more trusted by the dev community."],
+  ["openClawUsage.rank",        "OC Rank",    true,"usage",false,"Rank specifically on OpenClaw. Shows what models OpenClaw users prefer."],
+  ["openClawUsage.totalTokens", "OC Tokens",  true,"usage",true, "Total tokens used on OpenClaw via OpenRouter."],
+];
+
+const GROUPS = {
+  "":     {label:"",                   cls:"g-",     color:"var(--muted)"},
+  "aa":   {label:"Artificial Analysis",cls:"g-aa",   color:"var(--aa)"},
+  "ac":   {label:"Arena (Code + Chat)",cls:"g-ac",   color:"var(--ac)"},
+  "ce":   {label:"Claw-Eval",          cls:"g-ce",   color:"var(--ce)"},
+  "or":   {label:"OpenRouter",         cls:"g-or",   color:"var(--or)"},
+  "usage":{label:"Usage",              cls:"g-usage",color:"var(--usage)"},
+};
+
+const BAR_MAX = {
+  "aa.intelligenceIndex":60,"aa.codingIndex":60,"aa.mathIndex":100,
+  "aa.speedToksPerSec":300,"arenaCode.elo":1560,"arenaText.elo":1510,
+  "clawEval.passAll3Rate":1,"clawEval.avgCompletion":1,"clawEval.avgRobustness":1,
+  "orUsage.totalTokens":50e12,"openClawUsage.totalTokens":5e12,
+};
+
+const BAR_COLOR = {
+  aa:"var(--aa)", ac:"var(--ac)", ce:"var(--ce)", or:"var(--or)", usage:"var(--usage)"
+};
+
+function gv(obj, key) {
+  if (!key || key === "_rank") return null;
+  return key.split(".").reduce((o,k) => o?.[k] ?? null, obj);
+}
+
+function fmtVal(val, key) {
+  if (val == null) return null;
+  if (key.includes("Rate") || key.includes("Completion") || key.includes("Robust")) return (val*100).toFixed(1)+"%";
+  if (key.includes("outputPrice")) return val === 0 ? "Free" : "$"+val.toFixed(2);
+  if (key.includes("contextLength")) return val>=1e6?(val/1e6).toFixed(1)+"M":Math.round(val/1000)+"K";
+  if (key.includes("Tokens")) return val>=1e12?(val/1e12).toFixed(1)+"T":val>=1e9?(val/1e9).toFixed(0)+"B":val>=1e6?(val/1e6).toFixed(0)+"M":val;
+  if (key.includes("votes")) return val>=1000?(val/1000).toFixed(0)+"K":val;
+  return Number.isInteger(val) ? val : parseFloat(val).toFixed(1);
+}
+
+// Synthesize "best for" tags from data
+function getTags(m) {
+  const tags = [];
+  const aa = m.aa, or = m.openRouter;
+  if (aa?.codingIndex >= 40 && or?.supportsTools) tags.push("coding");
+  if (aa?.intelligenceIndex >= 48) tags.push("reasoning");
+  if (or?.supportsTools && m.clawEval?.passAll3Rate >= .5) tags.push("agents");
+  if (aa?.speedToksPerSec >= 120) tags.push("fast");
+  if (or?.isFree) tags.push("free");
+  if (or?.contextLength >= 500000) tags.push("long");
+  // Check if model id has image/vision in OR data
+  return tags;
+}
+
+function modelMatchesFilter(m) {
+  if (activeFilter === "all") return true;
+  const tags = getTags(m);
+  if (activeFilter === "coding")    return tags.includes("coding");
+  if (activeFilter === "agents")    return tags.includes("agents");
+  if (activeFilter === "reasoning") return tags.includes("reasoning");
+  if (activeFilter === "fast")      return tags.includes("fast");
+  if (activeFilter === "free")      return tags.includes("free");
+  if (activeFilter === "longctx")   return tags.includes("long");
+  if (activeFilter === "vision")    return m.openRouter?.id?.includes("vision") || m.openRouter?.id?.includes("vl") || false;
+  return true;
+}
+
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+  render();
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = col.includes(".rank") || col === "_rank"; }
+  render();
+}
+
+function buildHero() {
+  if (!data || !data.models.length) return;
+  const m = data.models;
+
+  const byIntel  = [...m].filter(x => x.aa?.intelligenceIndex).sort((a,b) => (b.aa.intelligenceIndex||0)-(a.aa.intelligenceIndex||0)).slice(0,3);
+  const byCoding = [...m].filter(x => x.aa?.codingIndex).sort((a,b) => (b.aa.codingIndex||0)-(a.aa.codingIndex||0)).slice(0,3);
+  const byFree   = [...m].filter(x => x.openRouter?.isFree && x.aa?.intelligenceIndex).sort((a,b) => (b.aa.intelligenceIndex||0)-(a.aa.intelligenceIndex||0)).slice(0,3);
+  const byAgents = [...m].filter(x => x.clawEval?.passAll3Rate).sort((a,b) => (b.clawEval.passAll3Rate||0)-(a.clawEval.passAll3Rate||0)).slice(0,3);
+  const byUsage  = [...m].filter(x => x.orUsage).sort((a,b) => (a.orUsage.rank||999)-(b.orUsage.rank||999)).slice(0,3);
+  const byOC     = [...m].filter(x => x.openClawUsage).sort((a,b) => (a.openClawUsage.rank||999)-(b.openClawUsage.rank||999)).slice(0,3);
+
+  function scoreOf(list, i) {
+    const x = list[i];
+    if (!x) return "";
+    return x;
+  }
+
+  const cards = [
+    {
+      label: "🧠 Top Intelligence", cls: "aa", sub: "AA Intelligence Index",
+      rows: byIntel.map(x => ({ name: x.name, creator: x.creator, score: x.aa.intelligenceIndex.toFixed(1) }))
+    },
+    {
+      label: "💻 Top Coding", cls: "aa", sub: "AA Coding Index",
+      rows: byCoding.map(x => ({ name: x.name, creator: x.creator, score: x.aa.codingIndex.toFixed(1) }))
+    },
+    {
+      label: "🆓 Best Free Models", cls: "ac", sub: "Intelligence (free tier)",
+      rows: byFree.map(x => ({ name: x.name, creator: x.creator, score: x.aa.intelligenceIndex.toFixed(1) }))
+    },
+    {
+      label: "🤖 Top Agents", cls: "ce", sub: "Claw-Eval Pass³ rate",
+      rows: byAgents.map(x => ({ name: x.name, creator: x.creator, score: (x.clawEval.passAll3Rate*100).toFixed(1)+"%" }))
+    },
+    {
+      label: "📊 Most Used on OpenRouter", cls: "usage", sub: "Total tokens processed",
+      rows: byUsage.map(x => ({ name: x.name, creator: x.creator, score: (x.orUsage.totalTokens/1e12).toFixed(1)+"T" }))
+    },
+    {
+      label: "⚡ Most Used on OpenClaw", cls: "usage", sub: "Tokens via OpenClaw app",
+      rows: byOC.length ? byOC.map(x => ({ name: x.name, creator: x.creator, score: (x.openClawUsage.totalTokens/1e9).toFixed(0)+"B" }))
+                       : [{ name: "No data yet", creator: "Hit Refresh to load", score: "" }]
+    },
+  ];
+
+  const posCls = ["p1","p2","p3"];
+
+  document.getElementById("hero").innerHTML = cards.map(c => `
+    <div class="hero-card ${c.cls}">
+      <div class="hero-card-label">${c.label}</div>
+      <div class="hero-list">
+        ${c.rows.map((r, i) => `
+          <div class="hero-row">
+            <div class="hero-pos ${posCls[i]}">${i+1}</div>
+            <div class="hero-row-info">
+              <div class="hero-row-name" title="${r.name}">${r.name}</div>
+              <div class="hero-row-meta">${r.creator}</div>
+            </div>
+            ${r.score ? `<div class="hero-row-score">${r.score}</div>` : ""}
+          </div>
+          ${i < c.rows.length-1 ? '<div class="hero-divider"></div>' : ''}
+        `).join("")}
+        ${c.rows.length === 0 ? '<div style="font-size:.72rem;color:var(--muted)">No data</div>' : ''}
+      </div>
+      <div style="font-size:.62rem;color:var(--muted);margin-top:10px">${c.sub}</div>
+    </div>`).join("");
+}
+
+function render() {
+  if (!data) return;
+  buildHero();
+
+  const s = data.sources;
+  const onOR = data.models.filter(m => m.openRouter).length;
+  document.getElementById("statsRow").innerHTML = [
+    ["Total Models",   data.models.length, ""],
+    ["AA Indexed",     s.aa.count,          "aa"],
+    ["Arena Code",     s.arenaCode.count,   "ac"],
+    ["Claw-Eval",      s.clawEval.count,    "ce"],
+    ["On OpenRouter",  `${onOR}/${data.models.length}`, "or"],
+    ["OR Rankings",    s.orRankings.count,  "usage"],
+    ["OpenClaw Apps",  s.openClawUsage?.count || 0, "usage"],
+  ].map(([l,v,c]) => `<div class="stat-pill"><div class="stat-pill-label">${l}</div><div class="stat-pill-val ${c}">${v}</div></div>`).join("");
+
+  if (data.generatedAt) {
+    document.getElementById("tsLabel").textContent = "Updated " + new Date(data.generatedAt).toLocaleString();
+  }
+
+  // Group spans
+  const spans = [];
+  let last = null, span = 0;
+  for (const [,,,grp] of COLS) {
+    const g = grp || "";
+    if (g !== last && last !== null) { spans.push([last, span]); span = 0; }
+    last = g; span++;
+  }
+  spans.push([last, span]);
+
+  const ghRow = "<tr>" + spans.map(([g, sp]) => {
+    const info = GROUPS[g] || GROUPS[""];
+    return `<th class="gh ${info.cls}" colspan="${sp}">${info.label}</th>`;
+  }).join("") + "</tr>";
+
+  const shRow = "<tr>" + COLS.map(([key, label, num, grp, end, tip]) => {
+    const active = sortCol === key;
+    const cls = ["sh", num?"num":"", "g-"+(grp||""), end?"ge":"", active?"active":""].filter(Boolean).join(" ");
+    const arrow = active ? (sortAsc ? "▲" : "▼") : "⇅";
+    const tipHtml = tip ? `<span class="tip-icon" data-tip="${tip}">ⓘ</span>` : "";
+    return `<th class="${cls}" onclick="sortBy('${key}')"><div class="th-inner">${label}${tipHtml}<span class="sort-arrow">${arrow}</span></div></th>`;
+  }).join("") + "</tr>";
+
+  document.getElementById("thead").innerHTML = ghRow + shRow;
+
+  const q = document.getElementById("searchInput").value.trim().toLowerCase();
+
+  // Filter + sort
+  let rows = [...data.models].filter(m => {
+    if (!modelMatchesFilter(m)) return false;
+    if (q) return m.name.toLowerCase().includes(q) || m.creator.toLowerCase().includes(q) || (m.openRouter?.id || "").toLowerCase().includes(q);
+    return true;
+  }).sort((a, b) => {
+    let va = gv(a, sortCol), vb = gv(b, sortCol);
+    if (typeof va === "boolean") { va = va?1:0; vb = vb?1:0; }
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1; if (vb == null) return -1;
+    if (typeof va === "string") return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return sortAsc ? va - vb : vb - va;
+  });
+
+  if (!rows.length) {
+    document.getElementById("tbody").innerHTML = `<tr><td colspan="${COLS.length}" class="empty">No models match this filter.</td></tr>`;
+    return;
+  }
+
+  function numCell(val, key, grp, isEnd) {
+    const gCls = "g-"+(grp||"");
+    const cls = ["num", gCls, isEnd?"ge":"", val==null?"":""].filter(Boolean).join(" ");
+    if (val == null) return `<td class="${cls}"><span class="score-empty">—</span></td>`;
+    const display = fmtVal(val, key);
+    const maxV = BAR_MAX[key];
+    const color = BAR_COLOR[grp] || "var(--muted)";
+    if (maxV) {
+      const pct = Math.min(100, (val / maxV) * 100);
+      return `<td class="${cls}">
+        <div class="score-bar-wrap">
+          <span class="score-val">${display}</span>
+          <div class="score-bar-track"><div class="score-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        </div></td>`;
+    }
+    return `<td class="${cls}"><span class="score-val">${display}</span></td>`;
+  }
+
+  document.getElementById("tbody").innerHTML = rows.map((m, i) => {
+    const rank = i + 1;
+    const rkCls = rank===1?"top1":rank===2?"top2":rank===3?"top3":"";
+    const aa = m.aa, ac = m.arenaCode, at = m.arenaText, ce = m.clawEval, or = m.openRouter;
+    const tags = getTags(m);
+    const tagMap = {coding:"💻 Coding",agents:"🤖 Agents",reasoning:"🧠 Reasoning",fast:"⚡ Fast",free:"🆓 Free",long:"📄 Long ctx"};
+
+    // Source dots
+    const srcDots = m.sources?.map(s => {
+      const dotC = {aa:"var(--aa)",arenaCode:"var(--ac)",arenaText:"var(--ac)",clawEval:"var(--ce)",openRouter:"var(--or)",orRankings:"var(--usage)",openClaw:"var(--usage)"}[s] || "var(--muted)";
+      return `<div class="src-dot" style="background:${dotC}" title="${s}"></div>`;
+    }).join("") || "";
+
+    let row = `<td class="g-"><span class="rank-num ${rkCls}">${rank}</span></td>`;
+    row += `<td class="g-">
+      <div class="model-cell">
+        <span class="model-name" title="${m.name}">${m.name}</span>
+        ${tags.length ? `<div class="model-tags">${tags.map(t=>`<span class="tag ${t==="long"?"long":t}">${tagMap[t]||t}</span>`).join("")}</div>` : ""}
+        <div class="src-dots">${srcDots}</div>
+      </div></td>`;
+    row += `<td class="g- ge"><span class="creator">${m.creator}</span></td>`;
+
+    // AA
+    row += numCell(aa?.intelligenceIndex, "aa.intelligenceIndex", "aa", false);
+    row += numCell(aa?.codingIndex,       "aa.codingIndex",       "aa", false);
+    row += numCell(aa?.mathIndex,         "aa.mathIndex",         "aa", false);
+    row += numCell(aa?.speedToksPerSec,   "aa.speedToksPerSec",   "aa", true);
+
+    // Arena Code + Text
+    row += numCell(ac?.elo,   "arenaCode.elo",   "ac", false);
+    row += numCell(ac?.rank,  "arenaCode.rank",  "ac", false);
+    row += numCell(at?.elo,   "arenaText.elo",   "ac", false);
+    row += numCell(at?.rank,  "arenaText.rank",  "ac", true);
+
+    // Claw-Eval
+    row += numCell(ce?.passAll3Rate,  "clawEval.passAll3Rate",  "ce", false);
+    row += numCell(ce?.avgCompletion, "clawEval.avgCompletion", "ce", false);
+    row += numCell(ce?.avgRobustness, "clawEval.avgRobustness", "ce", true);
+
+    // OpenRouter
+    const priceDisplay = or
+      ? (or.outputPricePerMillion===0 ? `<span class="pill free">Free</span>` : `<span class="score-val">$${or.outputPricePerMillion.toFixed(2)}</span>`)
+      : `<span class="score-empty">—</span>`;
+    const ctxDisplay = or
+      ? `<span class="score-val">${or.contextLength>=1e6?(or.contextLength/1e6).toFixed(1)+"M":Math.round(or.contextLength/1000)+"K"}</span>`
+      : `<span class="score-empty">—</span>`;
+    const toolBadge = or ? (or.supportsTools ? `<span class="pill yes">Yes</span>` : `<span class="pill no">No</span>`) : `<span class="score-empty">—</span>`;
+    const costBadge = or ? (or.isFree ? `<span class="pill free">Free</span>` : `<span class="pill paid">Paid</span>`) : `<span class="score-empty">—</span>`;
+    const orId      = or ? `<span class="or-id" title="${or.id}">${or.id}</span>` : `<span class="score-empty">Not on OpenRouter</span>`;
+
+    row += `<td class="num g-or">${priceDisplay}</td>`;
+    row += `<td class="num g-or">${ctxDisplay}</td>`;
+    row += `<td class="g-or">${toolBadge}</td>`;
+    row += `<td class="g-or">${costBadge}</td>`;
+    row += `<td class="g-or ge">${orId}</td>`;
+
+    // Usage
+    row += numCell(m.orUsage?.rank,              "orUsage.rank",              "usage", false);
+    row += numCell(m.orUsage?.totalTokens,       "orUsage.totalTokens",       "usage", false);
+    row += numCell(m.openClawUsage?.rank,        "openClawUsage.rank",        "usage", false);
+    row += numCell(m.openClawUsage?.totalTokens, "openClawUsage.totalTokens", "usage", true);
+
+    return `<tr>${row}</tr>`;
+  }).join("");
+}
+
+async function loadModels() {
+  try {
+    const res = await fetch("/api/models");
+    data = await res.json();
+    render();
+  } catch (e) { console.error(e); }
+}
+
+async function doRefresh() {
+  const btn = document.getElementById("refreshBtn");
+  const ov  = document.getElementById("loading");
+  btn.disabled = true;
+  btn.textContent = "Refreshing…";
+  ov.style.display = "flex";
+  try {
+    const res = await fetch("/api/refresh", { method: "POST" });
+    data = await res.json();
+    if (data.error) throw new Error(data.error);
+    render();
+  } catch (e) { alert("Refresh failed: " + e.message); }
+  finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg> Refresh`;
+    ov.style.display = "none";
+  }
+}
+
+loadModels();
+</script>
+</body>
+</html>
