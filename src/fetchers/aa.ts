@@ -15,6 +15,7 @@ export interface AAModel {
     math_500?: number | null;
     aime?: number | null;
   };
+  
   pricing?: {
     price_1m_blended_3_to_1?: number | null;
     price_1m_input_tokens?: number | null;
