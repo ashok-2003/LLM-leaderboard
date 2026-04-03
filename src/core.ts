@@ -191,9 +191,26 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
     return c;
   }
 
-  // From AA — top 50 by intelligence
-  const aaTop = aaModels
-    .filter(m => m.evaluations?.artificial_analysis_intelligence_index != null)
+  // Deduplicate AA models by family name (strip inference-setting suffixes like
+  // "(Reasoning)", "(xhigh)", "(Non-reasoning, High Effort)" etc.)
+  // Keep only the best-scoring variant per family — matching AA's own leaderboard.
+  function aaFamilyName(name: string): string {
+    return name.replace(/\s*\(.*?\)\s*$/, "").trim();
+  }
+  const aaByFamily = new Map<string, AAModel>();
+  for (const m of aaModels) {
+    if (m.evaluations?.artificial_analysis_intelligence_index == null) continue;
+    const family = aaFamilyName(m.name);
+    const existing = aaByFamily.get(family);
+    if (!existing ||
+        (m.evaluations.artificial_analysis_intelligence_index ?? 0) >
+        (existing.evaluations.artificial_analysis_intelligence_index ?? 0)) {
+      aaByFamily.set(family, m);
+    }
+  }
+
+  // From AA — top 50 deduplicated families by intelligence
+  const aaTop = [...aaByFamily.values()]
     .sort((a, b) =>
       (b.evaluations.artificial_analysis_intelligence_index ?? 0) -
       (a.evaluations.artificial_analysis_intelligence_index ?? 0)
@@ -282,7 +299,7 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
 
     return {
       id: c.id,
-      name: aa?.name ?? or?.name ?? c.name,
+      name: aa ? aaFamilyName(aa.name) : (or?.name ?? c.name),
       creator: aa?.model_creator.name ?? c.creator,
       sources: presentSources,
 

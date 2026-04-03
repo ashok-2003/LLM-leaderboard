@@ -140,9 +140,9 @@
     /* ── Table ── */
     .table-card {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+      border-radius: var(--radius); box-shadow: var(--shadow);
     }
-    .table-wrap { overflow-x: auto; }
+    .table-wrap { overflow-x: auto; overflow-y: visible; }
     table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1600px; font-size: .8rem; }
 
     /* Group header */
@@ -177,19 +177,25 @@
     th.active .sort-arrow { opacity: 1; }
 
     /* Tooltip on th */
-    .th-inner { display: flex; align-items: center; gap: 4px; white-space: nowrap; position: relative; }
+    .th-inner { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
     th.sh.num .th-inner { justify-content: flex-end; }
-    .tip-icon { width: 13px; height: 13px; border-radius: 50%; background: var(--faint); color: var(--muted); font-size: .58rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: help; }
-    .tip-icon:hover::after {
-      content: attr(data-tip);
-      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
-      background: #1E293B; color: #F1F5F9; font-size: .7rem; font-weight: 400;
-      padding: 6px 10px; border-radius: 6px; white-space: normal; width: 220px; line-height: 1.5;
-      z-index: 100; box-shadow: var(--shadow-md); pointer-events: none;
+    .tip-icon {
+      width: 14px; height: 14px; border-radius: 50%; background: var(--faint); color: var(--muted);
+      font-size: .58rem; display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0; cursor: help; transition: background .12s;
     }
-    .tip-icon:hover::before {
-      content: ''; position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%);
-      border: 5px solid transparent; border-top-color: #1E293B; z-index: 100;
+    .tip-icon:hover { background: var(--border2); color: var(--sub); }
+
+    /* JS tooltip box — fixed, placed by JS */
+    #tooltip {
+      position: fixed; z-index: 9999; pointer-events: none;
+      background: #1E293B; color: #F1F5F9; font-size: .72rem; font-weight: 400;
+      padding: 8px 12px; border-radius: 7px; max-width: 240px; line-height: 1.55;
+      box-shadow: 0 4px 16px rgba(0,0,0,.18); display: none;
+    }
+    #tooltip::after {
+      content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+      border: 5px solid transparent; border-top-color: #1E293B;
     }
 
     /* Group divider */
@@ -282,6 +288,83 @@
     /* Empty state */
     .empty { padding: 60px; text-align: center; color: var(--muted); font-size: .85rem; }
 
+    /* ── Value Analysis section ── */
+    .value-section { margin-top: 32px; }
+    .value-section-header { margin-bottom: 14px; }
+    .value-section-header h2 { font-size: 1.05rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .value-section-header p  { font-size: .78rem; color: var(--sub); line-height: 1.5; max-width: 700px; }
+    .value-disclaimer {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: .7rem; color: #92400E; background: #FEF3C7;
+      border: 1px solid #FDE68A; padding: 4px 10px; border-radius: 6px; margin-top: 8px;
+    }
+    .value-grid { display: flex; flex-direction: column; gap: 16px; }
+
+    .value-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .value-table-wrap { overflow-x: auto; }
+    .value-card-header {
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .value-card-title { font-size: .82rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+    .value-card-sub   { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+    .value-card-badge { font-size: .65rem; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
+    .value-card-badge.paid { background: var(--or-t); color: var(--or); }
+    .value-card-badge.free { background: var(--ac-t); color: var(--ac); }
+
+    .value-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+    .value-table th {
+      padding: 7px 12px; font-size: .67rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid var(--border);
+      background: var(--bg); text-align: left; white-space: nowrap;
+    }
+    .value-table th.r { text-align: right; }
+    .value-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
+    .value-table tr:last-child td { border-bottom: none; }
+    .value-table tr:hover td { background: #F8FAFC; }
+    .value-table tr.gold-row td { background: #FFFBEB; }
+
+    /* Quality score bar */
+    .qs-wrap  { display: flex; align-items: center; gap: 7px; }
+    .qs-bar   { width: 50px; height: 6px; background: var(--faint); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+    .qs-fill  { height: 100%; border-radius: 3px; }
+    .qs-num   { font-weight: 700; font-size: .78rem; min-width: 28px; }
+    .qs-num.high   { color: #059669; }
+    .qs-num.mid    { color: #D97706; }
+    .qs-num.low    { color: #DC2626; }
+    .qs-fill.high  { background: #10B981; }
+    .qs-fill.mid   { background: #F59E0B; }
+    .qs-fill.low   { background: #EF4444; }
+
+    /* Value score */
+    .vs-num { font-size: .9rem; font-weight: 800; color: var(--or); }
+    .vs-num.top { color: #B45309; }
+
+    /* Confidence badge */
+    .conf {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: .62rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; cursor: help;
+    }
+    .conf.full    { background: #D1FAE5; color: #065F46; }
+    .conf.good    { background: #DBEAFE; color: #1E40AF; }
+    .conf.partial { background: #FEF3C7; color: #92400E; }
+    .conf.minimal { background: #FCE7F3; color: #831843; }
+
+    /* Best value star badge */
+    .best-badge { font-size: .62rem; font-weight: 700; background: #FEF3C7; color: #92400E; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
+
+    /* Signal dots */
+    .sig-dots { display: flex; gap: 3px; }
+    .sig-dot  { width: 7px; height: 7px; border-radius: 50%; }
+    .sig-dot.on  { }
+    .sig-dot.off { opacity: .15; }
+
+    /* OR id in value table */
+    .v-orid { font-family: 'Fira Code', monospace; font-size: .67rem; color: var(--aa); max-width: 160px; overflow: hidden; text-overflow: ellipsis; display: block; }
+
     /* Source legend */
     .source-legend {
       display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
@@ -367,7 +450,78 @@
     </div>
   </div>
 
+  <!-- Value Analysis -->
+  <div class="value-section" id="valueSection" style="display:none">
+    <div class="value-section-header">
+      <h2>Quality × Value Analysis</h2>
+      <p>
+        <strong>Quality Score</strong> (0–100) blends intelligence benchmark, coding score, agent reliability and human ELO — weighted by whichever signals exist for each model.
+        <strong>Value Score</strong> = Quality ÷ Price per million tokens. Higher means more intelligence per dollar.
+      </p>
+      <div class="value-disclaimer">
+        ⚠ Scores use only available data per model. Models marked <em>Partial</em> or <em>Minimal</em> have fewer sources — treat them with caution.
+      </div>
+    </div>
+    <div class="value-grid">
+      <div class="value-card" id="paidValueCard">
+        <div class="value-card-header">
+          <div>
+            <div class="value-card-title">💰 Best Paid Value <span style="font-weight:400;color:var(--muted);font-size:.72rem">— most quality per dollar</span></div>
+            <div class="value-card-sub">Sorted by Value Score = Quality ÷ $/1M tokens</div>
+          </div>
+          <div class="value-card-badge paid">Paid only</div>
+        </div>
+        <div class="value-table-wrap">
+          <table class="value-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Model</th>
+                <th class="r">Quality</th>
+                <th class="r">$/1M out</th>
+                <th class="r">Value Score ↑</th>
+                <th>Data Sources</th>
+                <th>Confidence</th>
+                <th>Model ID</th>
+              </tr>
+            </thead>
+            <tbody id="paidValueBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="value-card" id="freeValueCard">
+        <div class="value-card-header">
+          <div>
+            <div class="value-card-title">🆓 Best Free Models <span style="font-weight:400;color:var(--muted);font-size:.72rem">— zero cost, sorted by quality</span></div>
+            <div class="value-card-sub">Free on OpenRouter — no per-token charge</div>
+          </div>
+          <div class="value-card-badge free">Free tier</div>
+        </div>
+        <div class="value-table-wrap">
+          <table class="value-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Model</th>
+                <th class="r">Quality</th>
+                <th class="r">Speed</th>
+                <th class="r">Context</th>
+                <th>Data Sources</th>
+                <th>Confidence</th>
+                <th>Model ID</th>
+              </tr>
+            </thead>
+            <tbody id="freeValueBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
+
+<!-- Tooltip -->
+<div id="tooltip"></div>
 
 <!-- Loading -->
 <div class="loading-overlay" id="loading" style="display:none">
@@ -569,6 +723,7 @@ function buildHero() {
 function render() {
   if (!data) return;
   buildHero();
+  buildValueTable();
 
   const s = data.sources;
   const onOR = data.models.filter(m => m.openRouter).length;
@@ -714,6 +869,179 @@ function render() {
 
     return `<tr>${row}</tr>`;
   }).join("");
+}
+
+// ── Tooltip ───────────────────────────────────────────────────────────────────
+(function() {
+  const box = document.getElementById("tooltip");
+  let current = null;
+
+  document.addEventListener("mouseover", e => {
+    const el = e.target.closest("[data-tip]");
+    if (!el) return;
+    const tip = el.getAttribute("data-tip");
+    if (!tip) return;
+    current = el;
+    box.textContent = tip;
+    box.style.display = "block";
+    positionTip(e);
+  });
+  document.addEventListener("mousemove", e => {
+    if (!current) return;
+    positionTip(e);
+  });
+  document.addEventListener("mouseout", e => {
+    if (e.target.closest("[data-tip]")) {
+      box.style.display = "none";
+      current = null;
+    }
+  });
+
+  function positionTip(e) {
+    const gap = 12;
+    let x = e.clientX - box.offsetWidth / 2;
+    let y = e.clientY - box.offsetHeight - gap;
+    // Keep inside viewport
+    x = Math.max(8, Math.min(x, window.innerWidth - box.offsetWidth - 8));
+    if (y < 8) y = e.clientY + gap; // flip below if too high
+    box.style.left = x + "px";
+    box.style.top  = y + "px";
+  }
+})();
+
+// ── Value Analysis ────────────────────────────────────────────────────────────
+
+function computeQuality(m) {
+  // Base weights: intel 45%, coding 25%, claw 20%, arena 10%
+  const BASE = { intel: .45, coding: .25, claw: .20, arena: .10 };
+  const vals = {};
+
+  const aa = m.aa, or = m.openRouter;
+  if (aa?.intelligenceIndex != null) vals.intel = aa.intelligenceIndex / 60;
+  if (aa?.codingIndex != null)       vals.coding = aa.codingIndex / 60;
+  if (m.clawEval?.passAll3Rate != null) vals.claw = m.clawEval.passAll3Rate;
+  const elo = m.arenaCode?.elo;
+  if (elo != null) vals.arena = Math.max(0, Math.min(1, (elo - 1200) / (1560 - 1200)));
+
+  const keys = Object.keys(vals);
+  if (!keys.length) return null;
+
+  const totalW = keys.reduce((s, k) => s + BASE[k], 0);
+  const score = keys.reduce((s, k) => s + (vals[k] * BASE[k] / totalW), 0) * 100;
+
+  const signalCount = keys.length;
+  const conf = signalCount >= 4 ? "full" : signalCount === 3 ? "good" : signalCount === 2 ? "partial" : "minimal";
+  const confLabel = { full:"Full", good:"Good", partial:"Partial", minimal:"Minimal" }[conf];
+  const signals = { intel: !!vals.intel, coding: !!vals.coding, claw: !!vals.claw, arena: !!vals.arena };
+  const sigTooltip = [
+    vals.intel  ? "✓ AA Intelligence" : "✗ AA Intelligence",
+    vals.coding ? "✓ AA Coding"       : "✗ AA Coding",
+    vals.claw   ? "✓ Claw-Eval"       : "✗ Claw-Eval",
+    vals.arena  ? "✓ Arena ELO"       : "✗ Arena ELO",
+  ].join(" | ");
+
+  return { score: Math.round(score * 10) / 10, conf, confLabel, signals, sigTooltip };
+}
+
+function qsHtml(score) {
+  if (score == null) return '<span style="color:var(--muted)">—</span>';
+  const tier = score >= 70 ? "high" : score >= 45 ? "mid" : "low";
+  const pct = Math.min(100, score);
+  return `<div class="qs-wrap">
+    <span class="qs-num ${tier}">${score.toFixed(1)}</span>
+    <div class="qs-bar"><div class="qs-fill ${tier}" style="width:${pct}%"></div></div>
+  </div>`;
+}
+
+function confHtml(q) {
+  return `<span class="conf ${q.conf}" data-tip="${q.sigTooltip}">${q.confLabel}</span>`;
+}
+
+function sigDotsHtml(q) {
+  const COLORS = { intel:"var(--aa)", coding:"var(--aa)", claw:"var(--ce)", arena:"var(--ac)" };
+  return `<div class="sig-dots" title="${q.sigTooltip}">
+    ${Object.entries(q.signals).map(([k,on]) =>
+      `<div class="sig-dot ${on?'on':'off'}" style="${on?'background:'+COLORS[k]:''};${!on?'background:var(--border2)':''}"></div>`
+    ).join("")}
+  </div>`;
+}
+
+function buildValueTable() {
+  if (!data) return;
+
+  const models = data.models;
+
+  // Paid: has price > 0 and enough data for quality score
+  const paid = models
+    .map(m => {
+      const or = m.openRouter;
+      if (!or || or.isFree || or.outputPricePerMillion <= 0) return null;
+      const q = computeQuality(m);
+      if (!q) return null;
+      const valueScore = Math.round((q.score / or.outputPricePerMillion) * 10) / 10;
+      return { m, q, valueScore };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.valueScore - a.valueScore);
+
+  // Free: isFree=true with quality score
+  const free = models
+    .map(m => {
+      const or = m.openRouter;
+      if (!or || !or.isFree) return null;
+      const q = computeQuality(m);
+      if (!q) return null;
+      return { m, q };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.q.score - a.q.score);
+
+  if (!paid.length && !free.length) return;
+  document.getElementById("valueSection").style.display = "";
+
+  // Paid table
+  document.getElementById("paidValueBody").innerHTML = paid.map(({ m, q, valueScore }, i) => {
+    const or = m.openRouter;
+    const rank = i + 1;
+    const isTop = rank === 1;
+    const vsClass = isTop ? "top" : "";
+    const ctx = or.contextLength >= 1e6 ? (or.contextLength/1e6).toFixed(1)+"M" : Math.round(or.contextLength/1000)+"K";
+    return `<tr class="${isTop?'gold-row':''}">
+      <td style="color:var(--muted);font-weight:700;font-size:.75rem">${rank}${isTop?' <span class="best-badge">Best</span>':''}</td>
+      <td>
+        <div style="font-weight:600;font-size:.8rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${m.name}">${m.name}</div>
+        <div style="font-size:.68rem;color:var(--muted)">${m.creator}</div>
+      </td>
+      <td class="r">${qsHtml(q.score)}</td>
+      <td class="r" style="font-weight:600">$${or.outputPricePerMillion.toFixed(2)}</td>
+      <td class="r"><span class="vs-num ${vsClass}">${valueScore.toFixed(1)}</span></td>
+      <td>${sigDotsHtml(q)}</td>
+      <td>${confHtml(q)}</td>
+      <td><span class="v-orid" title="${or.id}">${or.id}</span></td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="8" class="empty">No paid models with sufficient data</td></tr>';
+
+  // Free table
+  document.getElementById("freeValueBody").innerHTML = free.map(({ m, q }, i) => {
+    const or = m.openRouter;
+    const rank = i + 1;
+    const isTop = rank === 1;
+    const speed = m.aa?.speedToksPerSec ? m.aa.speedToksPerSec.toFixed(0)+" t/s" : "—";
+    const ctx = or ? (or.contextLength >= 1e6 ? (or.contextLength/1e6).toFixed(1)+"M" : Math.round(or.contextLength/1000)+"K") : "—";
+    return `<tr class="${isTop?'gold-row':''}">
+      <td style="color:var(--muted);font-weight:700;font-size:.75rem">${rank}${isTop?' <span class="best-badge" style="background:#D1FAE5;color:#065F46">Top Free</span>':''}</td>
+      <td>
+        <div style="font-weight:600;font-size:.8rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${m.name}">${m.name}</div>
+        <div style="font-size:.68rem;color:var(--muted)">${m.creator}</div>
+      </td>
+      <td class="r">${qsHtml(q.score)}</td>
+      <td class="r" style="color:var(--sub)">${speed}</td>
+      <td class="r" style="color:var(--sub)">${ctx}</td>
+      <td>${sigDotsHtml(q)}</td>
+      <td>${confHtml(q)}</td>
+      <td><span class="v-orid" title="${or?.id||''}">${or?.id||'—'}</span></td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="8" class="empty">No free models with sufficient data</td></tr>';
 }
 
 async function loadModels() {
