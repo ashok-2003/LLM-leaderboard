@@ -151,7 +151,7 @@
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); box-shadow: var(--shadow);
     }
-    .table-wrap { overflow-x: auto; overflow-y: visible; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1600px; font-size: .8rem; }
 
     /* Group header */
@@ -391,6 +391,24 @@
     .rank-chip.usage { background: var(--usage-t); color: var(--usage); }
     .rank-chip.oc    { background: var(--usage-t); color: var(--usage); }
 
+    /* Percentile color cells for value matrix */
+    .pct-cell { padding: 6px 8px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; font-size: .76rem; }
+    .pct-cell.p-top    { background: #D1FAE5; color: #065F46; }
+    .pct-cell.p-mid    { background: #FEF9C3; color: #854D0E; }
+    .pct-cell.p-low    { background: #FEE2E2; color: #991B1B; }
+    .pct-cell.p-none   { background: transparent; color: var(--muted); font-weight: 400; }
+    /* For price: low price = green (inverted) */
+    .pct-cell.p-top-inv { background: #FEE2E2; color: #991B1B; }
+    .pct-cell.p-mid-inv { background: #FEF9C3; color: #854D0E; }
+    .pct-cell.p-low-inv { background: #D1FAE5; color: #065F46; }
+
+    /* Efficiency score */
+    .eff-score { font-size: .9rem; font-weight: 800; }
+    .eff-score.tier-s { color: #059669; }
+    .eff-score.tier-a { color: #2563EB; }
+    .eff-score.tier-b { color: #D97706; }
+    .eff-score.tier-c { color: #DC2626; }
+
     /* OR id in value table */
     .v-orid { font-family: 'Fira Code', monospace; font-size: .67rem; color: var(--aa); max-width: 160px; overflow: hidden; text-overflow: ellipsis; display: block; }
 
@@ -500,21 +518,26 @@
       <div class="value-card" id="paidValueCard">
         <div class="value-card-header">
           <div>
-            <div class="value-card-title">💰 Best Paid Value <span style="font-weight:400;color:var(--muted);font-size:.72rem">— most quality per dollar</span></div>
-            <div class="value-card-sub">Sorted by Value Score = Quality ÷ $/1M tokens</div>
+            <div class="value-card-title">💰 Decision Matrix <span style="font-weight:400;color:var(--muted);font-size:.72rem">— quality balanced against cost</span></div>
+            <div class="value-card-sub">Ranks shown per platform. Green = top 25%, Yellow = mid, Red = bottom 25%. Hover for details.</div>
           </div>
-          <div class="value-card-badge paid">Paid only</div>
+          <div class="value-card-badge paid">Paid models</div>
         </div>
         <div class="value-table-wrap">
-          <table class="value-table">
+          <table class="value-table" id="paidValueTable">
             <thead>
               <tr>
                 <th>#</th>
                 <th>Model</th>
-                <th class="r">Quality</th>
-                <th class="r">$/1M out</th>
-                <th class="r">Value Score ↑</th>
-                <th>Platform Ranks</th>
+                <th class="r">Intel</th>
+                <th class="r">Coding</th>
+                <th class="r">Arena</th>
+                <th class="r">Claw³</th>
+                <th class="r">Speed</th>
+                <th class="r">$/1M</th>
+                <th class="r">Context</th>
+                <th>Tools</th>
+                <th class="r">Efficiency ↑</th>
                 <th>Confidence</th>
                 <th>Model ID</th>
               </tr>
@@ -532,15 +555,19 @@
           <div class="value-card-badge free">Free tier</div>
         </div>
         <div class="value-table-wrap">
-          <table class="value-table">
+          <table class="value-table" id="freeValueTable">
             <thead>
               <tr>
                 <th>#</th>
                 <th>Model</th>
-                <th class="r">Quality</th>
+                <th class="r">Intel</th>
+                <th class="r">Coding</th>
+                <th class="r">Arena</th>
+                <th class="r">Claw³</th>
                 <th class="r">Speed</th>
                 <th class="r">Context</th>
-                <th>Platform Ranks</th>
+                <th>Tools</th>
+                <th class="r">Quality ↑</th>
                 <th>Confidence</th>
                 <th>Model ID</th>
               </tr>
@@ -634,8 +661,9 @@ const BAR_COLOR = {
 
 function gv(obj, key) {
   if (!key || key === "_rank") return null;
-  // When sorting by intelligence, respect the current score mode
   if (key === "aa.intelligenceIndex") return effectiveIntel(obj);
+  if (key === "aa.codingIndex") return effectiveCoding(obj);
+  if (key === "aa.mathIndex") return effectiveMath(obj);
   return key.split(".").reduce((o,k) => o?.[k] ?? null, obj);
 }
 
@@ -690,15 +718,24 @@ function setScoreMode(mode, el) {
   render();
 }
 
-// Get the effective intelligence score for a model based on current scoreMode
+// Get effective scores for a model based on current scoreMode
 function effectiveIntel(m) {
   const aa = m.aa;
   if (!aa) return null;
-  if (scoreMode === "practical") {
-    // Fall back to ceiling if practical not available
-    return aa.practicalIndex ?? aa.intelligenceIndex;
-  }
+  if (scoreMode === "practical") return aa.practicalIndex ?? aa.intelligenceIndex;
   return aa.intelligenceIndex;
+}
+function effectiveCoding(m) {
+  const aa = m.aa;
+  if (!aa) return null;
+  if (scoreMode === "practical") return aa.practicalCodingIndex ?? aa.codingIndex;
+  return aa.codingIndex;
+}
+function effectiveMath(m) {
+  const aa = m.aa;
+  if (!aa) return null;
+  if (scoreMode === "practical") return aa.practicalMathIndex ?? aa.mathIndex;
+  return aa.mathIndex;
 }
 
 function sortBy(col) {
@@ -899,8 +936,30 @@ function render() {
         ${hasDiff ? `<span class="${pracCls}" data-tip="${pracTip}">${prac.toFixed(1)}</span>` : ''}
       </div>` : `<span class="score-empty">—</span>`;
     row += `<td class="num g-aa">${intelHtml}</td>`;
-    row += numCell(aa?.codingIndex,       "aa.codingIndex",       "aa", false);
-    row += numCell(aa?.mathIndex,         "aa.mathIndex",         "aa", false);
+
+    // Coding: ceiling + practical
+    const codeCeil = aa?.codingIndex;
+    const codePrac = aa?.practicalCodingIndex;
+    const codeHasDiff = codePrac != null && codeCeil != null && Math.abs(codeCeil - codePrac) >= 0.5;
+    const codeCeilCls = isCeilMode ? "intel-active" : "intel-dim";
+    const codePracCls = !isCeilMode ? "intel-active-prac" : "intel-prac";
+    const codeHtml = codeCeil != null ? `<div class="intel-cell">
+      <span class="${codeCeilCls}" data-tip="Ceiling coding: ${codeCeil}">${codeCeil.toFixed(1)}</span>
+      ${codeHasDiff ? `<span class="${codePracCls}" data-tip="Practical coding: ${codePrac}">${codePrac.toFixed(1)}</span>` : ''}
+    </div>` : `<span class="score-empty">—</span>`;
+    row += `<td class="num g-aa">${codeHtml}</td>`;
+
+    // Math: ceiling + practical
+    const mathCeil = aa?.mathIndex;
+    const mathPrac = aa?.practicalMathIndex;
+    const mathHasDiff = mathPrac != null && mathCeil != null && Math.abs(mathCeil - mathPrac) >= 0.5;
+    const mathCeilCls = isCeilMode ? "intel-active" : "intel-dim";
+    const mathPracCls = !isCeilMode ? "intel-active-prac" : "intel-prac";
+    const mathHtml = mathCeil != null ? `<div class="intel-cell">
+      <span class="${mathCeilCls}" data-tip="Ceiling math: ${mathCeil}">${mathCeil.toFixed(1)}</span>
+      ${mathHasDiff ? `<span class="${mathPracCls}" data-tip="Practical math: ${mathPrac}">${mathPrac.toFixed(1)}</span>` : ''}
+    </div>` : `<span class="score-empty">—</span>`;
+    row += `<td class="num g-aa">${mathHtml}</td>`;
     row += numCell(aa?.speedToksPerSec,   "aa.speedToksPerSec",   "aa", true);
 
     // Arena Code + Text
@@ -988,8 +1047,9 @@ function computeQuality(m) {
 
   const aa = m.aa, or = m.openRouter;
   const intel = effectiveIntel(m);
+  const coding = effectiveCoding(m);
   if (intel != null) vals.intel = intel / 60;
-  if (aa?.codingIndex != null) vals.coding = aa.codingIndex / 60;
+  if (coding != null) vals.coding = coding / 60;
   if (m.clawEval?.passAll3Rate != null) vals.claw = m.clawEval.passAll3Rate;
   const elo = m.arenaCode?.elo;
   if (elo != null) vals.arena = Math.max(0, Math.min(1, (elo - 1200) / (1560 - 1200)));
@@ -1064,23 +1124,73 @@ function sigDotsHtml(q) {
 
 function buildValueTable() {
   if (!data) return;
-
   const models = data.models;
 
-  // Paid: has price > 0 and enough data for quality score
+  // ── Compute GLOBAL ranks across all models for each platform metric ──
+  function computeRanks(list, getter, desc = true) {
+    const ranked = list
+      .map((m, idx) => ({ m, val: getter(m), idx }))
+      .filter(x => x.val != null)
+      .sort((a, b) => desc ? b.val - a.val : a.val - b.val);
+    const rankMap = new Map();
+    ranked.forEach((x, i) => rankMap.set(x.m, i + 1));
+    return rankMap;
+  }
+
+  const allRanks = {
+    aaIntel:  computeRanks(models, m => effectiveIntel(m)),
+    aaCoding: computeRanks(models, m => effectiveCoding(m)),
+    arenaCode:computeRanks(models, m => m.arenaCode?.elo),
+    arenaText:computeRanks(models, m => m.arenaText?.elo),
+    clawEval: computeRanks(models, m => m.clawEval?.passAll3Rate),
+    speed:    computeRanks(models, m => m.aa?.speedToksPerSec),
+    orUsage:  computeRanks(models, m => m.orUsage?.totalTokens),
+  };
+
+  // Total models that have data for each metric (for "out of N" tooltip)
+  const totals = {
+    aaIntel:   allRanks.aaIntel.size,
+    aaCoding:  allRanks.aaCoding.size,
+    arenaCode: allRanks.arenaCode.size,
+    arenaText: allRanks.arenaText.size,
+    clawEval:  allRanks.clawEval.size,
+    speed:     allRanks.speed.size,
+    orUsage:   allRanks.orUsage.size,
+  };
+
+  // Rank cell: shows #N with color based on percentile position
+  function rankCell(m, key, label) {
+    const rankMap = allRanks[key];
+    const total = totals[key];
+    const r = rankMap?.get(m);
+    if (r == null) return '<td class="pct-cell p-none">—</td>';
+    const pct = r / total; // 0 = best, 1 = worst
+    const cls = pct <= 0.25 ? "p-top" : pct >= 0.75 ? "p-low" : "p-mid";
+    return `<td class="pct-cell ${cls}" data-tip="${label}: rank #${r} of ${total}">#${r}</td>`;
+  }
+
+  function effTier(v) {
+    if (v >= 100) return "tier-s";
+    if (v >= 30) return "tier-a";
+    if (v >= 10) return "tier-b";
+    return "tier-c";
+  }
+
+  // ── Build paid list ──
   const paid = models
     .map(m => {
       const or = m.openRouter;
       if (!or || or.isFree || or.outputPricePerMillion <= 0) return null;
       const q = computeQuality(m);
       if (!q) return null;
-      const valueScore = Math.round((q.score / or.outputPricePerMillion) * 10) / 10;
-      return { m, q, valueScore };
+      const price = or.outputPricePerMillion;
+      const efficiency = Math.round((q.score / Math.sqrt(price + 0.1)) * 10) / 10;
+      return { m, q, efficiency, price };
     })
     .filter(Boolean)
-    .sort((a, b) => b.valueScore - a.valueScore);
+    .sort((a, b) => b.efficiency - a.efficiency);
 
-  // Free: isFree=true with quality score
+  // ── Build free list ──
   const free = models
     .map(m => {
       const or = m.openRouter;
@@ -1095,49 +1205,71 @@ function buildValueTable() {
   if (!paid.length && !free.length) return;
   document.getElementById("valueSection").style.display = "";
 
-  // Paid table
-  document.getElementById("paidValueBody").innerHTML = paid.map(({ m, q, valueScore }, i) => {
+  const fPrice = v => "$" + v.toFixed(2);
+  const fCtx = v => v >= 1e6 ? (v/1e6).toFixed(1)+"M" : Math.round(v/1000)+"K";
+
+  // Price percentiles for coloring (inverted: cheap = green)
+  const priceVals = paid.map(x => x.price).sort((a,b) => a-b);
+  const priceP25 = priceVals[Math.floor(priceVals.length * 0.25)] ?? 0;
+  const priceP75 = priceVals[Math.floor(priceVals.length * 0.75)] ?? 0;
+  function pricePctCls(v) {
+    if (v <= priceP25) return "p-top"; // cheap = green
+    if (v >= priceP75) return "p-low"; // expensive = red
+    return "p-mid";
+  }
+
+  // ── Paid table rows ──
+  document.getElementById("paidValueBody").innerHTML = paid.map(({ m, q, efficiency, price }, i) => {
     const or = m.openRouter;
     const rank = i + 1;
-    const isTop = rank === 1;
-    const vsClass = isTop ? "top" : "";
-    const ctx = or.contextLength >= 1e6 ? (or.contextLength/1e6).toFixed(1)+"M" : Math.round(or.contextLength/1000)+"K";
-    return `<tr class="${isTop?'gold-row':''}">
-      <td style="color:var(--muted);font-weight:700;font-size:.75rem">${rank}${isTop?' <span class="best-badge">Best</span>':''}</td>
+    const ctx = fCtx(or.contextLength);
+    const tools = or.supportsTools;
+
+    return `<tr class="${rank===1?'gold-row':''}">
+      <td style="color:var(--muted);font-weight:700;font-size:.75rem">${rank}${rank===1?' <span class="best-badge">Best</span>':''}</td>
       <td>
-        <div style="font-weight:600;font-size:.8rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${m.name}">${m.name}</div>
-        <div style="font-size:.68rem;color:var(--muted)">${m.creator}</div>
+        <div style="font-weight:600;font-size:.78rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${m.name}">${m.name}</div>
+        <div style="font-size:.65rem;color:var(--muted)">${m.creator}</div>
       </td>
-      <td class="r">${qsHtml(q.score)}</td>
-      <td class="r" style="font-weight:600">$${or.outputPricePerMillion.toFixed(2)}</td>
-      <td class="r"><span class="vs-num ${vsClass}">${valueScore.toFixed(1)}</span></td>
-      <td>${platformRanksHtml(m)}</td>
+      ${rankCell(m, "aaIntel", "AA Intelligence")}
+      ${rankCell(m, "aaCoding", "AA Coding")}
+      ${rankCell(m, "arenaCode", "Arena Code ELO")}
+      ${rankCell(m, "clawEval", "Claw-Eval Pass³")}
+      ${rankCell(m, "speed", "Output Speed")}
+      <td class="pct-cell ${pricePctCls(price)}" data-tip="Output: ${fPrice(price)}/1M tokens">${fPrice(price)}</td>
+      <td class="pct-cell p-none" style="color:var(--sub)">${ctx}</td>
+      <td>${tools ? '<span class="pill yes">Yes</span>' : '<span class="pill no">No</span>'}</td>
+      <td style="text-align:right"><span class="eff-score ${effTier(efficiency)}">${efficiency.toFixed(1)}</span></td>
       <td>${confHtml(q)}</td>
       <td><span class="v-orid" title="${or.id}">${or.id}</span></td>
     </tr>`;
-  }).join("") || '<tr><td colspan="8" class="empty">No paid models with sufficient data</td></tr>';
+  }).join("") || '<tr><td colspan="13" class="empty">No paid models with data</td></tr>';
 
-  // Free table
+  // ── Free table rows ──
   document.getElementById("freeValueBody").innerHTML = free.map(({ m, q }, i) => {
     const or = m.openRouter;
     const rank = i + 1;
-    const isTop = rank === 1;
-    const speed = m.aa?.speedToksPerSec ? m.aa.speedToksPerSec.toFixed(0)+" t/s" : "—";
-    const ctx = or ? (or.contextLength >= 1e6 ? (or.contextLength/1e6).toFixed(1)+"M" : Math.round(or.contextLength/1000)+"K") : "—";
-    return `<tr class="${isTop?'gold-row':''}">
-      <td style="color:var(--muted);font-weight:700;font-size:.75rem">${rank}${isTop?' <span class="best-badge" style="background:#D1FAE5;color:#065F46">Top Free</span>':''}</td>
+    const ctx = or ? fCtx(or.contextLength) : "—";
+    const tools = or?.supportsTools;
+
+    return `<tr class="${rank===1?'gold-row':''}">
+      <td style="color:var(--muted);font-weight:700;font-size:.75rem">${rank}${rank===1?' <span class="best-badge" style="background:#D1FAE5;color:#065F46">Top</span>':''}</td>
       <td>
-        <div style="font-weight:600;font-size:.8rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${m.name}">${m.name}</div>
-        <div style="font-size:.68rem;color:var(--muted)">${m.creator}</div>
+        <div style="font-weight:600;font-size:.78rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${m.name}">${m.name}</div>
+        <div style="font-size:.65rem;color:var(--muted)">${m.creator}</div>
       </td>
-      <td class="r">${qsHtml(q.score)}</td>
-      <td class="r" style="color:var(--sub)">${speed}</td>
-      <td class="r" style="color:var(--sub)">${ctx}</td>
-      <td>${platformRanksHtml(m)}</td>
+      ${rankCell(m, "aaIntel", "AA Intelligence")}
+      ${rankCell(m, "aaCoding", "AA Coding")}
+      ${rankCell(m, "arenaCode", "Arena Code ELO")}
+      ${rankCell(m, "clawEval", "Claw-Eval Pass³")}
+      ${rankCell(m, "speed", "Output Speed")}
+      <td class="pct-cell p-none" style="color:var(--sub)">${ctx}</td>
+      <td>${tools ? '<span class="pill yes">Yes</span>' : '<span class="pill no">No</span>'}</td>
+      <td style="text-align:right">${qsHtml(q.score)}</td>
       <td>${confHtml(q)}</td>
       <td><span class="v-orid" title="${or?.id||''}">${or?.id||'—'}</span></td>
     </tr>`;
-  }).join("") || '<tr><td colspan="8" class="empty">No free models with sufficient data</td></tr>';
+  }).join("") || '<tr><td colspan="12" class="empty">No free models with data</td></tr>';
 }
 
 async function loadModels() {

@@ -18,7 +18,9 @@ export interface UnifiedModel {
     practicalIndex: number | null;          // practical — non-reasoning/default setting
     ceilingSetting: string | null;          // label e.g. "Adaptive Reasoning, Max Effort"
     codingIndex: number | null;
+    practicalCodingIndex: number | null;
     mathIndex: number | null;
+    practicalMathIndex: number | null;
     speedToksPerSec: number | null;
   } | null;
 
@@ -98,24 +100,6 @@ function orModelKeys(model: OpenRouterModel): string[] {
   return [...new Set(keys.filter(k => k.length > 3))];
 }
 
-// Keys from an OpenRouter model ID like "qwen/qwen3.6-plus-preview:free"
-function orIdKeys(id: string): string[] {
-  const keys: string[] = [];
-  keys.push(norm(id));
-  keys.push(norm(id.replace(/:free$/, "")));
-  const parts = id.split("/");
-  if (parts.length >= 2) {
-    const slug = parts.slice(1).join("/").replace(/:free$/, "");
-    keys.push(norm(slug));
-    keys.push(norm(parts[0] + slug));
-    // strip date suffixes like -20260205
-    const noDate = slug.replace(/-\d{8}$/, "");
-    keys.push(norm(noDate));
-    keys.push(norm(parts[0] + noDate));
-  }
-  return [...new Set(keys.filter(k => k.length > 3))];
-}
-
 type IndexMap<T> = Map<string, T[]>;
 
 function buildIndex<T>(items: T[], keyFn: (item: T) => string[]): IndexMap<T> {
@@ -174,7 +158,67 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
   const now = new Date().toISOString();
 
   // ── Build indexes ──
+  // OR catalog: primary index by exact ID, plus fuzzy index by normalized keys
+  const orCatalogById = new Map<string, OpenRouterModel>();
+  for (const m of orModels) orCatalogById.set(m.id, m);
   const orIndex      = buildIndex(orModels, orModelKeys);
+
+  // Resolve a rankings-style versioned model ID to a catalog model.
+  // Rankings use IDs like "anthropic/claude-4.6-opus-20260205",
+  // catalog uses "anthropic/claude-opus-4.6". Try multiple strategies.
+  function resolveRankingId(rawId: string): OpenRouterModel | null {
+    // 1. Exact match
+    if (orCatalogById.has(rawId)) return orCatalogById.get(rawId)!;
+    // 2. Strip :free suffix
+    const noFree = rawId.replace(/:free$/, "");
+    if (orCatalogById.has(noFree)) return orCatalogById.get(noFree)!;
+    // 3. Progressively strip suffixes and try each form
+    const suffixStrips = [
+      noFree,
+      noFree.replace(/-\d{8}$/, ""),                    // -20260205
+      noFree.replace(/-\d{4}$/, ""),                    // -0127
+      noFree.replace(/-\d{2}-\d{2}$/, ""),              // -05-20
+      noFree.replace(/-preview$/, ""),                   // -preview
+      noFree.replace(/-\d{8}$/, "").replace(/-preview$/, ""), // both
+    ];
+    for (const s of suffixStrips) {
+      // Prefer :free variant first (more common on rankings),
+      // then fall back to paid variant
+      if (orCatalogById.has(s + ":free")) return orCatalogById.get(s + ":free")!;
+      if (orCatalogById.has(s)) return orCatalogById.get(s)!;
+    }
+    const noDate = suffixStrips[suffixStrips.length - 1];
+    // 4. Try fuzzy match via normalized keys against full OR index
+    const keys = [norm(rawId), norm(noFree), norm(noDate)];
+    const parts = rawId.split("/");
+    if (parts.length >= 2) {
+      const slug = parts.slice(1).join("/")
+        .replace(/:free$/, "")
+        .replace(/-\d{8}$/, "")
+        .replace(/-\d{4}$/, "")
+        .replace(/-\d{2}-\d{2}$/, "")
+        .replace(/-preview$/, "");
+      keys.push(norm(slug));
+      keys.push(norm(parts[0] + slug));
+    }
+    const fuzzy = lookupFirst(orIndex, keys);
+    if (fuzzy) return fuzzy;
+    // 5. Last resort: find a catalog model from the same vendor where
+    //    sorting the alphanumeric characters of the slug produces the same set.
+    //    This catches "claude-4.6-opus" → "claude-opus-4.6" (same chars, different order).
+    if (parts.length >= 2) {
+      const vendor = parts[0];
+      const rankSlug = norm(noDate.split("/").slice(1).join("/"));
+      const rankChars = rankSlug.split("").sort().join("");
+      for (const [catId, catModel] of orCatalogById) {
+        if (!catId.startsWith(vendor + "/")) continue;
+        const catSlug = norm(catId.replace(/:free$/, "").split("/").slice(1).join("/"));
+        const catChars = catSlug.split("").sort().join("");
+        if (rankChars === catChars) return catModel;
+      }
+    }
+    return null;
+  }
   const arenaCodeIdx = buildIndex(arenaCodeResult.models as (ArenaModel & { vendor: string })[], m => modelKeys(m.vendor, m.model));
   const arenaTextIdx = buildIndex(arenaTextResult.models as (ArenaModel & { vendor: string })[], m => modelKeys(m.vendor, m.model));
   const clawIdx      = buildIndex(clawModels, m => modelKeys(m.org, m.name));
@@ -281,25 +325,31 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
   }
 
   // From OR Rankings — top 40
+  // CRITICAL: Only include if we can resolve to a real catalog model.
+  // Rankings use versioned IDs that differ from catalog canonical IDs.
   for (const r of orRankings.slice(0, 40)) {
-    const keys = orIdKeys(r.modelId);
-    const orMatch = lookupFirst(orIndex, keys);
-    const name = orMatch?.name ?? r.modelId.split("/").slice(1).join("/");
-    const creator = r.modelId.split("/")[0] ?? "Unknown";
-    const c = getOrCreateCandidate(keys, name, creator);
-    c.orRanked = r;
-    if (orMatch && !c.orModel) c.orModel = orMatch;
+    const catalogMatch = resolveRankingId(r.modelId);
+    if (!catalogMatch) continue; // Skip — can't verify this model exists on OpenRouter
+    // Use the CATALOG model's keys to find/create candidate (not the ranking ID)
+    const keys = orModelKeys(catalogMatch);
+    const c = getOrCreateCandidate(keys, catalogMatch.name, catalogMatch.id.split("/")[0] ?? "Unknown");
+    // Keep the ranking entry with the highest token count (multiple slugs may map to same catalog model)
+    if (!c.orRanked || r.totalTokens > c.orRanked.totalTokens) {
+      c.orRanked = r;
+    }
+    if (!c.orModel) c.orModel = catalogMatch;
   }
 
-  // From OpenClaw usage
+  // From OpenClaw usage — same resolution logic
   for (const r of openClawRankings) {
-    const keys = orIdKeys(r.modelId);
-    const orMatch = lookupFirst(orIndex, keys);
-    const name = orMatch?.name ?? r.modelId.split("/").slice(1).join("/");
-    const creator = r.modelId.split("/")[0] ?? "Unknown";
-    const c = getOrCreateCandidate(keys, name, creator);
-    c.openClawRanked = r;
-    if (orMatch && !c.orModel) c.orModel = orMatch;
+    const catalogMatch = resolveRankingId(r.modelId);
+    if (!catalogMatch) continue;
+    const keys = orModelKeys(catalogMatch);
+    const c = getOrCreateCandidate(keys, catalogMatch.name, catalogMatch.id.split("/")[0] ?? "Unknown");
+    if (!c.openClawRanked || r.totalTokens > c.openClawRanked.totalTokens) {
+      c.openClawRanked = r;
+    }
+    if (!c.orModel) c.orModel = catalogMatch;
   }
 
   // ── Deduplicate pool (multiple keys may point to same Candidate) ──
@@ -333,7 +383,9 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
         practicalIndex:    c.aaPractical?.evaluations.artificial_analysis_intelligence_index ?? null,
         ceilingSetting:    extractSetting(aa.name) || null,
         codingIndex:       aa.evaluations.artificial_analysis_coding_index ?? null,
+        practicalCodingIndex: c.aaPractical?.evaluations.artificial_analysis_coding_index ?? null,
         mathIndex:         aa.evaluations.artificial_analysis_math_index ?? null,
+        practicalMathIndex: c.aaPractical?.evaluations.artificial_analysis_math_index ?? null,
         speedToksPerSec:   aa.median_output_tokens_per_second ?? null,
       } : null,
 
