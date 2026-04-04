@@ -294,6 +294,8 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
     const c = getOrCreateCandidate(keys, aa.name, aa.model_creator.name);
     c.aaModel = aa;
     c.aaPractical = practical;
+    const orMatch = lookupFirst(orIndex, keys);
+    if (orMatch && !c.orModel) c.orModel = orMatch;
   }
 
   // From Arena Code — top 40
@@ -361,7 +363,11 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
     const ac  = c.arenaCodeModel ?? lookupFirst(arenaCodeIdx, [c.id]);
     const at  = c.arenaTextModel ?? lookupFirst(arenaTextIdx, [c.id]);
     const ce  = c.clawModel      ?? lookupFirst(clawIdx,      [c.id]);
-    const or  = c.orModel        ?? lookupFirst(orIndex,      [c.id]);
+    const orFallbackKeys = c.aaModel
+      ? [...modelKeys(c.aaModel.model_creator.name, c.aaModel.name),
+         norm(c.aaModel.model_creator.slug + c.aaModel.slug), norm(c.aaModel.slug)]
+      : [c.id];
+    const or  = c.orModel        ?? lookupFirst(orIndex,      orFallbackKeys);
 
     const presentSources: string[] = [];
     if (aa) presentSources.push("aa");
