@@ -137,34 +137,68 @@ export async function fetchOpenRouterRankings(): Promise<ORRankedModel[]> {
 }
 
 /**
- * OpenClaw-specific rankings page.
- * Falls back to the old chart-scraping method since the app page
- * may not have the structured rankingData format.
+ * OpenClaw-specific rankings.
+ *
+ * The OpenClaw app page on OpenRouter is fully client-rendered (no SSR data).
+ * Strategy:
+ *   1. Try live fetch — parse chart data from the HTML if present
+ *   2. Fall back to saved snapshot on disk (data/raw/openclaw-rankings.html)
+ *   3. If neither works, return empty (graceful degradation)
  */
 export async function fetchOpenClawRankings(): Promise<OROpenClawModel[]> {
-  const url = "https://openrouter.ai/apps?url=https%3A%2F%2Fopenclaw.ai%2F";
+  // Try live fetch first
+  const liveResult = await fetchOpenClawFromUrl(
+    "https://openrouter.ai/apps?url=https%3A%2F%2Fopenclaw.ai%2F"
+  );
+  if (liveResult.length > 0) return liveResult;
 
-  // Try structured data first
-  const entries = await parseRankingsData(url);
-  if (entries.length) {
-    const dates = [...new Set(entries.map(e => e.date))].sort();
-    const latestDate = dates[dates.length - 1];
-    const byModel = new Map<string, number>();
-    for (const e of entries) {
-      if (e.date !== latestDate) continue;
-      const key = e.model_permaslug;
-      byModel.set(key, (byModel.get(key) ?? 0) + (e.total_prompt_tokens ?? 0) + (e.total_completion_tokens ?? 0));
+  // Fall back to saved HTML snapshot on disk
+  try {
+    const { readFileSync } = await import("fs");
+    const { resolve, dirname } = await import("path");
+    const { fileURLToPath } = await import("url");
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const savedPath = resolve(__dirname, "../../data/raw/openclaw-rankings.html");
+    const html = readFileSync(savedPath, "utf-8");
+    const result = parseChartData(html);
+    if (result.length > 0) {
+      console.log(`  OpenClaw: using saved snapshot (${result.length} models)`);
+      return result;
     }
-    const sorted = [...byModel.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
-    return sorted.map(([modelId, totalTokens], i) => ({
-      modelId, totalTokens, openclawRank: i + 1,
-    }));
-  }
+  } catch {}
 
-  // Fallback: scrape chart data
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-  if (!res.ok) return [];
-  const html = await res.text();
+  return [];
+}
+
+async function fetchOpenClawFromUrl(url: string): Promise<OROpenClawModel[]> {
+  try {
+    // Try structured rankingData first
+    const entries = await parseRankingsData(url);
+    if (entries.length) {
+      const dates = [...new Set(entries.map(e => e.date))].sort();
+      const latestDate = dates[dates.length - 1];
+      const byModel = new Map<string, number>();
+      for (const e of entries) {
+        if (e.date !== latestDate) continue;
+        const key = e.model_permaslug;
+        byModel.set(key, (byModel.get(key) ?? 0) + (e.total_prompt_tokens ?? 0) + (e.total_completion_tokens ?? 0));
+      }
+      const sorted = [...byModel.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
+      return sorted.map(([modelId, totalTokens], i) => ({
+        modelId, totalTokens, openclawRank: i + 1,
+      }));
+    }
+
+    // Try chart data from fresh fetch
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!res.ok) return [];
+    return parseChartData(await res.text());
+  } catch {
+    return [];
+  }
+}
+
+function parseChartData(html: string): OROpenClawModel[] {
   const pairs = html.matchAll(/\\"([a-z][a-z0-9_-]+\/[a-z][a-z0-9._:@-]+)\\":(\d{8,})/g);
   const totals = new Map<string, number>();
   for (const [, model, tokens] of pairs) {
