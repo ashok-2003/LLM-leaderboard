@@ -15,7 +15,7 @@ export interface AAModel {
     math_500?: number | null;
     aime?: number | null;
   };
-  
+
   pricing?: {
     price_1m_blended_3_to_1?: number | null;
     price_1m_input_tokens?: number | null;
@@ -28,6 +28,7 @@ export interface AAModel {
 export async function fetchAAModels(apiKey: string): Promise<AAModel[]> {
   const res = await fetch("https://artificialanalysis.ai/api/v2/data/llms/models", {
     headers: { "x-api-key": apiKey },
+    signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error(`AA API error: ${res.status} ${res.statusText}`);
   const body = await res.json();

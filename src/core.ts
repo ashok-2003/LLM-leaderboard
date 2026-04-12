@@ -146,14 +146,16 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
     arenaCodeResult, arenaTextResult,
     clawModels, orRankings, openClawRankings,
   ] = await Promise.all([
-    fetchAAModels(apiKey),
-    fetchOpenRouterModels(),
-    fetchArenaCode().catch(() => ({ meta: { leaderboard: "code", model_count: 0 }, models: [] as ArenaModel[] })),
-    fetchArenaText().catch(() => ({ meta: { leaderboard: "text", model_count: 0 }, models: [] as ArenaModel[] })),
-    fetchClawEvalModels().catch(() => [] as ClawEvalModel[]),
-    fetchOpenRouterRankings().catch(() => [] as ORRankedModel[]),
-    fetchOpenClawRankings().catch(() => [] as OROpenClawModel[]),
+    fetchAAModels(apiKey).catch((e) => { console.warn("AA fetch failed:", e.message); return [] as AAModel[]; }),
+    fetchOpenRouterModels().catch((e) => { console.warn("OR catalog failed:", e.message); return [] as OpenRouterModel[]; }),
+    fetchArenaCode().catch((e) => { console.warn("Arena Code failed:", e.message); return { meta: { leaderboard: "code", model_count: 0 }, models: [] as ArenaModel[] }; }),
+    fetchArenaText().catch((e) => { console.warn("Arena Text failed:", e.message); return { meta: { leaderboard: "text", model_count: 0 }, models: [] as ArenaModel[] }; }),
+    fetchClawEvalModels().catch((e) => { console.warn("Claw-Eval failed:", e.message); return [] as ClawEvalModel[]; }),
+    fetchOpenRouterRankings().catch((e) => { console.warn("OR Rankings failed:", e.message); return [] as ORRankedModel[]; }),
+    fetchOpenClawRankings().catch((e) => { console.warn("OpenClaw failed:", e.message); return [] as OROpenClawModel[]; }),
   ]);
+
+  console.log(`Sources: AA=${aaModels.length} OR=${orModels.length} ArenaCode=${arenaCodeResult.models.length} ArenaText=${arenaTextResult.models.length} Claw=${clawModels.length} ORRank=${orRankings.length} OC=${openClawRankings.length}`);
 
   const now = new Date().toISOString();
 
@@ -277,13 +279,13 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
     }
   }
 
-  // From AA — top 50 deduplicated families by intelligence
+  // From AA — top 15 deduplicated families by intelligence
   const aaTop = [...aaByFamily.values()]
     .sort((a, b) =>
       (b.best.evaluations.artificial_analysis_intelligence_index ?? 0) -
       (a.best.evaluations.artificial_analysis_intelligence_index ?? 0)
     )
-    .slice(0, 50);
+    .slice(0, 15);
 
   for (const { best: aa, practical } of aaTop) {
     const keys = [
@@ -298,8 +300,8 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
     if (orMatch && !c.orModel) c.orModel = orMatch;
   }
 
-  // From Arena Code — top 40
-  for (const m of arenaCodeResult.models.slice(0, 40)) {
+  // From Arena Code — top 15
+  for (const m of arenaCodeResult.models.slice(0, 15)) {
     const keys = modelKeys(m.vendor, m.model);
     const c = getOrCreateCandidate(keys, m.model, m.vendor);
     c.arenaCodeModel = m as ArenaModel & { vendor: string };
@@ -308,8 +310,8 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
     if (orMatch && !c.orModel) c.orModel = orMatch;
   }
 
-  // From Arena Text — top 30
-  for (const m of arenaTextResult.models.slice(0, 30)) {
+  // From Arena Text — top 15
+  for (const m of arenaTextResult.models.slice(0, 15)) {
     const keys = modelKeys(m.vendor, m.model);
     const c = getOrCreateCandidate(keys, m.model, m.vendor);
     c.arenaTextModel = m as ArenaModel & { vendor: string };
@@ -317,8 +319,11 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
     if (orMatch && !c.orModel) c.orModel = orMatch;
   }
 
-  // From Claw-Eval — all models
-  for (const m of clawModels) {
+  // From Claw-Eval — top 15 by avg_score
+  const clawTop15 = [...clawModels]
+    .sort((a, b) => b.avg_score - a.avg_score)
+    .slice(0, 15);
+  for (const m of clawTop15) {
     const keys = modelKeys(m.org, m.name);
     const c = getOrCreateCandidate(keys, m.name, m.org);
     c.clawModel = m;
@@ -326,10 +331,10 @@ export async function fetchAll(apiKey: string): Promise<MultiSourceResult> {
     if (orMatch && !c.orModel) c.orModel = orMatch;
   }
 
-  // From OR Rankings — top 40
+  // From OR Rankings — top 15
   // CRITICAL: Only include if we can resolve to a real catalog model.
   // Rankings use versioned IDs that differ from catalog canonical IDs.
-  for (const r of orRankings.slice(0, 40)) {
+  for (const r of orRankings.slice(0, 15)) {
     const catalogMatch = resolveRankingId(r.modelId);
     if (!catalogMatch) continue; // Skip — can't verify this model exists on OpenRouter
     // Use the CATALOG model's keys to find/create candidate (not the ranking ID)

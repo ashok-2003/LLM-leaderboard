@@ -15,7 +15,8 @@ export interface ArenaResult {
 
 async function fetchArenaLeaderboard(name: string): Promise<ArenaResult> {
   const res = await fetch(
-    `https://api.wulong.dev/arena-ai-leaderboards/v1/leaderboard?name=${name}`
+    `https://api.wulong.dev/arena-ai-leaderboards/v1/leaderboard?name=${name}`,
+    { signal: AbortSignal.timeout(10000) },
   );
   if (!res.ok) throw new Error(`Arena API error (${name}): ${res.status} ${res.statusText}`);
   return await res.json();
